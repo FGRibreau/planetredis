@@ -5,7 +5,6 @@ body
 	font-family: "Ubuntu Beta", UbuntuBeta, Ubuntu, "Bitstream Vera Sans", "DejaVu Sans", Tahoma, sans-serif;
 	background: #ecebe9;
 	font-size: 13px;
-	background: url("/images/dotted-bg.png");
 	line-height: 1.5;
 	color: #333;
 }
