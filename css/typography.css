@@ -1,0 +1,82 @@
+body
+{
+	margin: 0 auto;
+	width: 984px;
+	font-family: "Ubuntu Beta", UbuntuBeta, Ubuntu, "Bitstream Vera Sans", "DejaVu Sans", Tahoma, sans-serif;
+	background: #ecebe9;
+	font-size: 13px;
+	background: url("/images/dotted-bg.png");
+	line-height: 1.5;
+	color: #333;
+}
+
+.clearBoth
+{
+	clear: both;
+}
+
+
+h1
+{
+	font-size: 28px;
+	line-height: 40px;
+	margin: 0 0 8px;
+	font-weight: normal;
+}
+
+h1.pagetitle
+{
+	margin: 64px 0 0 8px;
+	height: 138px;
+	color: #741546;
+}
+
+h2
+{
+	font-size: 24px;
+	line-height: 28px;
+	margin: 8px 0 8px 0;
+	font-weight: normal;
+}
+
+h3
+{
+	font-size: 16px;
+	line-height: 24px;
+	margin: 0 0 8px 0;
+	font-weight: normal;
+}
+
+h4
+{
+	font-size: 12px;
+	margin: 0;
+	font-weight: normal;
+}
+
+p
+{
+	font-size: 13px;
+	margin: 0 0 1em 0;
+}
+
+a
+{
+	color: #dd4814;
+	text-decoration: none;
+}
+
+a img
+{
+	border: none;
+}
+
+a:hover
+{
+	text-decoration: underline;
+}
+
+a:visited
+{
+	color: #dd4814;
+}

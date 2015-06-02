@@ -1,0 +1,89 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en">
+<head>
+	<title><TMPL_VAR name></title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="robots" content="index,follow" />
+	<link rel="stylesheet" type="text/css" href="css/style.css" />
+	<link rel="alternate" type="application/rss+xml" href="<TMPL_VAR link>rss20.xml" title="<TMPL_VAR name> RSS" />
+	<script src="/css/yui-combined.min.js"></script>
+	<script src="/css/core.js"></script>
+	<link rel="stylesheet" type="text/css" media="all" href="//fonts.googleapis.com/css?family=Ubuntu:300,400,400italic" />
+</head>
+
+<body class="blog">
+<div id="wrapper" class="hfeed">
+
+<div id="header">
+
+<div id="orangeHeader">
+	<h1>
+		<a href="<TMPL_VAR link>" title="<TMPL_VAR name>"><span><TMPL_VAR name></span></a>
+	</h1>
+</div>
+
+</div>
+
+	<div id="main">
+		<div id="container">
+			<div id="content">
+
+			<TMPL_VAR admin>
+
+<TMPL_LOOP Items>
+
+	<div class="hentry post">
+		<div class="postHeader">
+	<img class="face" src="images/nobody.png" alt="">
+
+			<h2 class="entry-title"><a href="<TMPL_VAR link ESCAPE="HTML">" title="<TMPL_VAR channel_title_plain ESCAPE="HTML">"><TMPL_VAR title></a></h2>
+
+<h3><TMPL_VAR channel_name></h3>
+
+			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-content">
+			<TMPL_VAR content>
+			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-utility">
+			<span class="cat-links"><a href="<TMPL_VAR link ESCAPE="HTML">"> on <TMPL_VAR date><TMPL_IF category> tagged with <TMPL_VAR category></TMPL_IF></a></span>
+		</div>
+	</div><!-- .post -->
+</TMPL_LOOP>
+
+			</div><!-- #content -->
+		</div><!-- #container -->
+
+		<div id="secondary" class="aside main-aside">
+			<ul class="xoxo">
+				<li class="widgetcontainer widget_text">
+					<h3 class="widgettitle">About the Community MongoDB Blog Aggregator</h3>
+					<p>This website is a community-maintained and inclusive feed of MongoDB-related blog posts. To add your blog's feed, please fork <a href="https://github.com/xaprb/planetmongo-src">the repository</a>, modify the config.ini file to add your feed at the end, and submit a pull request.</p>
+				</li>
+				<li class="widgetcontainer widget_extended-categories">
+					<h3 class="widgettitle">Feeds</h3>
+					<ul>
+					<TMPL_LOOP Channels>
+						<li>
+							<a href="<TMPL_VAR url ESCAPE="HTML">" title="subscribe"><img src="images/feed-icon-10x10.png" alt="(feed)" /></a> <a <TMPL_IF link>href="<TMPL_VAR link ESCAPE="HTML">" </TMPL_IF><TMPL_IF message>class="message" title="<TMPL_VAR message ESCAPE="HTML">"</TMPL_IF><TMPL_UNLESS message>title="<TMPL_VAR title_plain ESCAPE="HTML">"</TMPL_UNLESS>><TMPL_VAR name></a>
+						</li>
+					</TMPL_LOOP>
+					</ul>
+				</li>
+			</ul>
+		</div><!-- #secondary .aside -->
+		<div class="clearBoth"></div>
+	</div><!-- #main -->
+</div><!-- #wrapper .hfeed -->
+
+<div id="footer">
+	<div id="siteinfo">
+		<p>
+			Blog entries aggregated on this page are owned by, and represent the opinion of the author.<br />
+			&copy; 2010 Baron Schwartz<br />
+		</p>
+	</div><!-- #siteinfo -->
+</div><!-- #footer -->
+</body>
+</html>
