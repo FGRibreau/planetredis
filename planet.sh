@@ -2,6 +2,9 @@
 
 set -e
 
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_rsa-pm
+ssh-add -l
 if [ ! -e ~/repos/planetmongo-src ]; then
 	mkdir -p ~/repos
 	cd ~/repos
