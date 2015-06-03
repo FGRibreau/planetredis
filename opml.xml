@@ -1,18 +1,13 @@
 <?xml version="1.0"?>
 <opml version="1.1">
 	<head>
-		<title>Community MongoDB Aggregator</title>
-		<dateModified>Wed, 03 Jun 2015 01:20:07 +0000</dateModified>
+		<title>Community Redis Aggregator</title>
+		<dateModified>Wed, 03 Jun 2015 01:35:39 +0000</dateModified>
 		<ownerName>Baron Schwartz</ownerName>
 		<ownerEmail>baron.schwartz@gmail.com</ownerEmail>
 	</head>
 	
 	<body>
-		<outline type="rss" text="A. Jesse Jiryu Davis" xmlUrl="http://emptysqua.re/blog/feed" title="A. Jesse Jiryu Davis" />
-		<outline type="rss" text="Baron Schwartz" xmlUrl="http://www.xaprb.com/tags/mongodb/index.xml" title="Baron Schwartz" />
-		<outline type="rss" text="Gustavo Niemeyer" xmlUrl="http://blog.labix.org/feed" title="Labix Blog" />
-		<outline type="rss" text="MongoDB Management Service" xmlUrl="http://blog.mms.mongodb.com/rss" title="MMS Blog" />
-		<outline type="rss" text="MongoDB Spain" xmlUrl="http://www.mongodbspain.com/en/feed/" title="MongoDB Spain" />
-		<outline type="rss" text="Tim Callaghan" xmlUrl="http://www.acmebenchmarking.com//feeds/posts/default" title="Acme Benchmarking" />
+		<outline type="rss" text="VividCortex" xmlUrl="https://vividcortex.com/categories/redis/index.xml" title="VividCortex" />
 	</body>
 </opml>

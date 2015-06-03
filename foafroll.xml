@@ -7,83 +7,18 @@
 	xmlns:dc="http://purl.org/dc/elements/1.1/"
 >
 <foaf:Group>
-	<foaf:name>Community MongoDB Aggregator</foaf:name>
-	<foaf:homepage>http://www.planetmongo.org/</foaf:homepage>
-	<rdfs:seeAlso rdf:resource="http://www.planetmongo.org/foafroll.xml" />
+	<foaf:name>Community Redis Aggregator</foaf:name>
+	<foaf:homepage>http://www.planetredis.org/</foaf:homepage>
+	<rdfs:seeAlso rdf:resource="http://www.planetredis.org/foafroll.xml" />
 
 	<foaf:member>
 		<foaf:Agent>
-			<foaf:name>A. Jesse Jiryu Davis</foaf:name>
+			<foaf:name>VividCortex</foaf:name>
 			<foaf:weblog>
-				<foaf:Document rdf:about="http://emptysqua.re/blog/">
-					<dc:title>A. Jesse Jiryu Davis</dc:title>
-					<rdfs:seeAlso>
-						<rss:channel rdf:about="http://emptysqua.re/blog/feed" />
-					</rdfs:seeAlso>
-				</foaf:Document>
-			</foaf:weblog>
-		</foaf:Agent>
-	</foaf:member>
-	<foaf:member>
-		<foaf:Agent>
-			<foaf:name>Baron Schwartz</foaf:name>
-			<foaf:weblog>
-				<foaf:Document rdf:about="http://www.xaprb.com/tags/mongodb/">
+				<foaf:Document rdf:about="">
 					<dc:title></dc:title>
 					<rdfs:seeAlso>
-						<rss:channel rdf:about="http://www.xaprb.com/tags/mongodb/index.xml" />
-					</rdfs:seeAlso>
-				</foaf:Document>
-			</foaf:weblog>
-		</foaf:Agent>
-	</foaf:member>
-	<foaf:member>
-		<foaf:Agent>
-			<foaf:name>Gustavo Niemeyer</foaf:name>
-			<foaf:weblog>
-				<foaf:Document rdf:about="http://blog.labix.org">
-					<dc:title>Labix Blog</dc:title>
-					<rdfs:seeAlso>
-						<rss:channel rdf:about="http://blog.labix.org/feed" />
-					</rdfs:seeAlso>
-				</foaf:Document>
-			</foaf:weblog>
-		</foaf:Agent>
-	</foaf:member>
-	<foaf:member>
-		<foaf:Agent>
-			<foaf:name>MongoDB Management Service</foaf:name>
-			<foaf:weblog>
-				<foaf:Document rdf:about="http://blog.mms.mongodb.com/">
-					<dc:title>MMS Blog</dc:title>
-					<rdfs:seeAlso>
-						<rss:channel rdf:about="http://blog.mms.mongodb.com/rss" />
-					</rdfs:seeAlso>
-				</foaf:Document>
-			</foaf:weblog>
-		</foaf:Agent>
-	</foaf:member>
-	<foaf:member>
-		<foaf:Agent>
-			<foaf:name>MongoDB Spain</foaf:name>
-			<foaf:weblog>
-				<foaf:Document rdf:about="http://www.mongodbspain.com/en">
-					<dc:title>MongoDB Spain</dc:title>
-					<rdfs:seeAlso>
-						<rss:channel rdf:about="http://www.mongodbspain.com/en/feed/" />
-					</rdfs:seeAlso>
-				</foaf:Document>
-			</foaf:weblog>
-		</foaf:Agent>
-	</foaf:member>
-	<foaf:member>
-		<foaf:Agent>
-			<foaf:name>Tim Callaghan</foaf:name>
-			<foaf:weblog>
-				<foaf:Document rdf:about="http://www.acmebenchmarking.com/">
-					<dc:title>Acme Benchmarking</dc:title>
-					<rdfs:seeAlso>
-						<rss:channel rdf:about="http://www.acmebenchmarking.com//feeds/posts/default" />
+						<rss:channel rdf:about="https://vividcortex.com/categories/redis/index.xml" />
 					</rdfs:seeAlso>
 				</foaf:Document>
 			</foaf:weblog>
