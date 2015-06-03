@@ -24,6 +24,32 @@
 			</foaf:weblog>
 		</foaf:Agent>
 	</foaf:member>
+	<foaf:member>
+		<foaf:Agent>
+			<foaf:name>Pivotal</foaf:name>
+			<foaf:weblog>
+				<foaf:Document rdf:about="http://blog.pivotal.io">
+					<dc:title>Pivotal P.O.V. » Redis</dc:title>
+					<rdfs:seeAlso>
+						<rss:channel rdf:about="http://blog.pivotal.io/tag/redis/feed" />
+					</rdfs:seeAlso>
+				</foaf:Document>
+			</foaf:weblog>
+		</foaf:Agent>
+	</foaf:member>
+	<foaf:member>
+		<foaf:Agent>
+			<foaf:name>Redis Labs</foaf:name>
+			<foaf:weblog>
+				<foaf:Document rdf:about="">
+					<dc:title></dc:title>
+					<rdfs:seeAlso>
+						<rss:channel rdf:about="https://redislabs.com/feed" />
+					</rdfs:seeAlso>
+				</foaf:Document>
+			</foaf:weblog>
+		</foaf:Agent>
+	</foaf:member>
 
 </foaf:Group>
 </rdf:RDF>
