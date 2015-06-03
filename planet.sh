@@ -13,6 +13,7 @@ if [ ! -e ~/repos/planetmongo-src ]; then
 fi
 cd ~/repos/planetmongo-web
 git checkout gh-pages
+git pull
 cd ~/repos/planetmongo-src
 git pull
 ./planet.py config.ini
