@@ -5,7 +5,7 @@
 	<link rel="self" href="http://www.planetmongo.org/atom.xml"/>
 	<link href="http://www.planetmongo.org/"/>
 	<id>http://www.planetmongo.org/atom.xml</id>
-	<updated>2015-06-03T00:50:06+00:00</updated>
+	<updated>2015-06-03T01:00:09+00:00</updated>
 	<generator uri="http://www.planetplanet.org/">Planet/2.0 +http://www.planetplanet.org</generator>
 
 	<entry xml:lang="en-US">
@@ -28,7 +28,7 @@ We expect to continue growing with you.&lt;/p&gt;</content>
 			<subtitle type="html">Comunidad Española sobre MongoDB</subtitle>
 			<link rel="self" href="http://www.mongodbspain.com/en/feed/"/>
 			<id>http://www.mongodbspain.com/en/feed/</id>
-			<updated>2015-06-03T00:50:03+00:00</updated>
+			<updated>2015-06-03T01:00:04+00:00</updated>
 		</source>
 	</entry>
 
@@ -62,7 +62,7 @@ We expect to continue growing with you.&lt;/p&gt;</content>
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -153,7 +153,7 @@ We expect to continue growing with you.&lt;/p&gt;</content>
 			<title type="html">MMS Blog</title>
 			<link rel="self" href="http://blog.mms.mongodb.com/rss"/>
 			<id>http://blog.mms.mongodb.com/rss</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -256,7 +256,7 @@ Done
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -357,7 +357,7 @@ beta now.&lt;/p&gt;
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -377,7 +377,7 @@ beta now.&lt;/p&gt;
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -550,7 +550,7 @@ mongoc_client_t &lt;span&gt;*&lt;/span&gt;client &lt;span&gt;=&lt;/span&gt; mong
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -586,7 +586,7 @@ mongoc_client_t &lt;span&gt;*&lt;/span&gt;client &lt;span&gt;=&lt;/span&gt; mong
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -644,7 +644,7 @@ mongoc_client_t &lt;span&gt;*&lt;/span&gt;client &lt;span&gt;=&lt;/span&gt; mong
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -682,7 +682,7 @@ mongoc_client_t &lt;span&gt;*&lt;/span&gt;client &lt;span&gt;=&lt;/span&gt; mong
 			<title type="html">MMS Blog</title>
 			<link rel="self" href="http://blog.mms.mongodb.com/rss"/>
 			<id>http://blog.mms.mongodb.com/rss</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -745,7 +745,7 @@ mongoc_client_t &lt;span&gt;*&lt;/span&gt;client &lt;span&gt;=&lt;/span&gt; mong
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -768,7 +768,7 @@ mongoc_client_t &lt;span&gt;*&lt;/span&gt;client &lt;span&gt;=&lt;/span&gt; mong
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -810,7 +810,7 @@ mongoc_client_t &lt;span&gt;*&lt;/span&gt;client &lt;span&gt;=&lt;/span&gt; mong
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -834,7 +834,7 @@ mongoc_client_t &lt;span&gt;*&lt;/span&gt;client &lt;span&gt;=&lt;/span&gt; mong
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -888,7 +888,7 @@ mongoc_client_t &lt;span&gt;*&lt;/span&gt;client &lt;span&gt;=&lt;/span&gt; mong
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -928,7 +928,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -948,7 +948,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -968,7 +968,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -1005,7 +1005,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -1049,7 +1049,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<title type="html">MMS Blog</title>
 			<link rel="self" href="http://blog.mms.mongodb.com/rss"/>
 			<id>http://blog.mms.mongodb.com/rss</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -1074,7 +1074,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -1097,7 +1097,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -1125,7 +1125,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -1170,7 +1170,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -1190,7 +1190,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -1210,7 +1210,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -1235,7 +1235,7 @@ In the dark and cloudy day.&lt;/p&gt;
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -1548,7 +1548,7 @@ FAILED (failures=1)
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -1598,7 +1598,7 @@ Many third-party tools will not work after you upgrade to authSchemaVersion 5. C
 			<title type="html">MMS Blog</title>
 			<link rel="self" href="http://blog.mms.mongodb.com/rss"/>
 			<id>http://blog.mms.mongodb.com/rss</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -1758,7 +1758,7 @@ AutoReconnect: No servers found yet
 			<title type="html">A. Jesse Jiryu Davis</title>
 			<link rel="self" href="http://emptysqua.re/blog/feed"/>
 			<id>http://emptysqua.re/blog/feed/</id>
-			<updated>2015-06-03T00:50:05+00:00</updated>
+			<updated>2015-06-03T01:00:07+00:00</updated>
 		</source>
 	</entry>
 
@@ -2018,7 +2018,7 @@ Config database is at version v6&lt;/pre&gt;
 			<subtitle type="html">Comunidad Española sobre MongoDB</subtitle>
 			<link rel="self" href="http://www.mongodbspain.com/en/feed/"/>
 			<id>http://www.mongodbspain.com/en/feed/</id>
-			<updated>2015-06-03T00:50:03+00:00</updated>
+			<updated>2015-06-03T01:00:04+00:00</updated>
 		</source>
 	</entry>
 
@@ -2301,7 +2301,7 @@ mongos&gt;&lt;/pre&gt;&lt;p&gt;If you are asking yourself how do I know the shar
 			<subtitle type="html">Comunidad Española sobre MongoDB</subtitle>
 			<link rel="self" href="http://www.mongodbspain.com/en/feed/"/>
 			<id>http://www.mongodbspain.com/en/feed/</id>
-			<updated>2015-06-03T00:50:03+00:00</updated>
+			<updated>2015-06-03T01:00:04+00:00</updated>
 		</source>
 	</entry>
 
@@ -2321,7 +2321,7 @@ mongos&gt;&lt;/pre&gt;&lt;p&gt;If you are asking yourself how do I know the shar
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2404,7 +2404,7 @@ mongos&gt;&lt;/pre&gt;&lt;p&gt;If you are asking yourself how do I know the shar
 			<title type="html">MMS Blog</title>
 			<link rel="self" href="http://blog.mms.mongodb.com/rss"/>
 			<id>http://blog.mms.mongodb.com/rss</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2424,7 +2424,7 @@ mongos&gt;&lt;/pre&gt;&lt;p&gt;If you are asking yourself how do I know the shar
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2444,7 +2444,7 @@ mongos&gt;&lt;/pre&gt;&lt;p&gt;If you are asking yourself how do I know the shar
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2464,7 +2464,7 @@ mongos&gt;&lt;/pre&gt;&lt;p&gt;If you are asking yourself how do I know the shar
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2484,7 +2484,7 @@ mongos&gt;&lt;/pre&gt;&lt;p&gt;If you are asking yourself how do I know the shar
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2664,7 +2664,7 @@ mongos&amp;gt;&lt;/pre&gt;&lt;p&gt;We have finished the setup of the sharded clu
 			<subtitle type="html">Comunidad Española sobre MongoDB</subtitle>
 			<link rel="self" href="http://www.mongodbspain.com/en/feed/"/>
 			<id>http://www.mongodbspain.com/en/feed/</id>
-			<updated>2015-06-03T00:50:03+00:00</updated>
+			<updated>2015-06-03T01:00:04+00:00</updated>
 		</source>
 	</entry>
 
@@ -2737,7 +2737,7 @@ mongos&amp;gt;&lt;/pre&gt;&lt;p&gt;We have finished the setup of the sharded clu
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2759,7 +2759,7 @@ mongos&amp;gt;&lt;/pre&gt;&lt;p&gt;We have finished the setup of the sharded clu
 			<subtitle type="html">Comunidad Española sobre MongoDB</subtitle>
 			<link rel="self" href="http://www.mongodbspain.com/en/feed/"/>
 			<id>http://www.mongodbspain.com/en/feed/</id>
-			<updated>2015-06-03T00:50:03+00:00</updated>
+			<updated>2015-06-03T01:00:04+00:00</updated>
 		</source>
 	</entry>
 
@@ -2911,7 +2911,7 @@ c: 3
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2931,7 +2931,7 @@ c: 3
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2951,7 +2951,7 @@ c: 3
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2971,7 +2971,7 @@ c: 3
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -2991,7 +2991,7 @@ c: 3
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -3011,7 +3011,7 @@ c: 3
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -3031,7 +3031,7 @@ c: 3
 			<subtitle type="html">Is it fast? I'll let you know.</subtitle>
 			<link rel="self" href="http://www.acmebenchmarking.com//feeds/posts/default"/>
 			<id>tag:blogger.com,1999:blog-8043938871710850997</id>
-			<updated>2015-06-03T00:50:06+00:00</updated>
+			<updated>2015-06-03T01:00:08+00:00</updated>
 		</source>
 	</entry>
 
