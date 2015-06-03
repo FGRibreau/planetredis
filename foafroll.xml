@@ -13,12 +13,64 @@
 
 	<foaf:member>
 		<foaf:Agent>
+			<foaf:name>A. Jesse Jiryu Davis</foaf:name>
+			<foaf:weblog>
+				<foaf:Document rdf:about="http://emptysqua.re/blog/">
+					<dc:title>A. Jesse Jiryu Davis</dc:title>
+					<rdfs:seeAlso>
+						<rss:channel rdf:about="http://emptysqua.re/blog/feed" />
+					</rdfs:seeAlso>
+				</foaf:Document>
+			</foaf:weblog>
+		</foaf:Agent>
+	</foaf:member>
+	<foaf:member>
+		<foaf:Agent>
 			<foaf:name>Baron Schwartz</foaf:name>
 			<foaf:weblog>
 				<foaf:Document rdf:about="http://www.xaprb.com/tags/mongodb/">
 					<dc:title></dc:title>
 					<rdfs:seeAlso>
 						<rss:channel rdf:about="http://www.xaprb.com/tags/mongodb/index.xml" />
+					</rdfs:seeAlso>
+				</foaf:Document>
+			</foaf:weblog>
+		</foaf:Agent>
+	</foaf:member>
+	<foaf:member>
+		<foaf:Agent>
+			<foaf:name>Gustavo Niemeyer</foaf:name>
+			<foaf:weblog>
+				<foaf:Document rdf:about="http://blog.labix.org">
+					<dc:title>Labix Blog</dc:title>
+					<rdfs:seeAlso>
+						<rss:channel rdf:about="http://blog.labix.org/feed" />
+					</rdfs:seeAlso>
+				</foaf:Document>
+			</foaf:weblog>
+		</foaf:Agent>
+	</foaf:member>
+	<foaf:member>
+		<foaf:Agent>
+			<foaf:name>MongoDB Management Service</foaf:name>
+			<foaf:weblog>
+				<foaf:Document rdf:about="http://blog.mms.mongodb.com/">
+					<dc:title>MMS Blog</dc:title>
+					<rdfs:seeAlso>
+						<rss:channel rdf:about="http://blog.mms.mongodb.com/rss" />
+					</rdfs:seeAlso>
+				</foaf:Document>
+			</foaf:weblog>
+		</foaf:Agent>
+	</foaf:member>
+	<foaf:member>
+		<foaf:Agent>
+			<foaf:name>MongoDB Spain</foaf:name>
+			<foaf:weblog>
+				<foaf:Document rdf:about="http://www.mongodbspain.com/en">
+					<dc:title>MongoDB Spain</dc:title>
+					<rdfs:seeAlso>
+						<rss:channel rdf:about="http://www.mongodbspain.com/en/feed/" />
 					</rdfs:seeAlso>
 				</foaf:Document>
 			</foaf:weblog>
