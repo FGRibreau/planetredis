@@ -5,10 +5,10 @@ set -e
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_rsa-pr
 ssh-add -l
-if [ ! -e ~/repos/planetredis-src ]; then
+if [ ! -e ~/repos/planetredis-web ]; then
 	mkdir -p ~/repos
 	cd ~/repos
-	git clone git@github.com:xaprb/planetredis-src
+	git clone git@github.com:VividCortex/planetredis-src
 	cp -R planetredis-src planetredis-web
 fi
 cd ~/repos/planetredis-web
