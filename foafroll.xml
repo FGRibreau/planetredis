@@ -13,12 +13,12 @@
 
 	<foaf:member>
 		<foaf:Agent>
-			<foaf:name>VividCortex</foaf:name>
+			<foaf:name>Antirez</foaf:name>
 			<foaf:weblog>
-				<foaf:Document rdf:about="">
-					<dc:title></dc:title>
+				<foaf:Document rdf:about="http://antirez.com">
+					<dc:title>Antirez weblog</dc:title>
 					<rdfs:seeAlso>
-						<rss:channel rdf:about="https://vividcortex.com/categories/redis/index.xml" />
+						<rss:channel rdf:about="http://antirez.com/rss" />
 					</rdfs:seeAlso>
 				</foaf:Document>
 			</foaf:weblog>

@@ -5,7 +5,424 @@
 	<link rel="self" href="http://www.planetredis.org/atom.xml"/>
 	<link href="http://www.planetredis.org/"/>
 	<id>http://www.planetredis.org/atom.xml</id>
-	<updated>2015-06-03T01:35:39+00:00</updated>
+	<updated>2015-06-03T01:40:05+00:00</updated>
 	<generator uri="http://www.planetplanet.org/">Planet/2.0 +http://www.planetplanet.org</generator>
+
+	<entry>
+		<title type="html">Adventures in message queues</title>
+		<link href="http://antirez.com/news/88"/>
+		<id>http://antirez.com/news/88</id>
+		<updated>2015-06-03T01:40:05+00:00</updated>
+		<content type="html">EDIT: In case you missed it, Disque source code is now available at http://github.com/antirez/disque
+&lt;br /&gt;
+&lt;br /&gt;It is a few months that I spend ~ 15-20% of my time, mostly hours stolen to nights and weekends, working to a new system. It’s a message broker and it’s called Disque. I’ve an implementation of 80% of what was in the original specification, but still I don’t feel like it’s ready to be released. Since I can’t ship, I’ll at least blog… so that’s the story of how it started and a few details about what it is.
+&lt;br /&gt;
+&lt;br /&gt;~ First steps ~
+&lt;br /&gt;
+&lt;br /&gt;Many developers use Redis as a message queue, often wrappered via some library abstracting away Redis low level primitives, other times directly building a simple, ad-hoc queue, using the Redis raw API. This use case is covered mainly using blocking list operations, and list push operations. Redis apparently is at the same time the best and the worst system to use like that. It’s good because it is fast, easy to inspect, deploy and use, and in many environments it was already one piece of the infrastructure. However it has disadvantages because Redis mutable data structures are very different than immutable messages. Redis HA / Cluster tradeoffs are totally biased towards large mutable values, but the same tradeoffs are not the best ones to deal with messages.
+&lt;br /&gt;
+&lt;br /&gt;One thing that is important to guarantee for a message broker is that a message is delivered either at least one time, or at most one time. In short given that to guarantee an exact single delivery of a message (where for delivery we intent a message that was received *and* processed by a worker) is practically impossible, the choices are that the message broker is able to guarantee either 0 or 1 deliveries, or 1 to infinite deliveries. This is often referred as at-most-once semantics, and at-least-once semantics. There are use cases for the first, but the most interesting and practical semantics is the latter, that is, to guarantee that a message is delivered at least one time, and deliver multiple times if there are failures.
+&lt;br /&gt;
+&lt;br /&gt;So a few months ago I started to think at some client-side protocol to use a set of Redis masters (without replication or clustering whatsoever) in a way that provides these guarantees. Sometimes with small changes in the way Redis is used for an use case, it is possible to end with a better system. For example for distributed locks I tried to document an algorithm which is trivial to implement but more robust than the single-instance + failover implementation (http://redis.io/topics/distlock).
+&lt;br /&gt;
+&lt;br /&gt;However after a few days of work my design draft suggested that it was a better bet to design an ad-hoc system, since the client-side algorithm ended being too complex, non optimal, and certain things I absolutely wanted were impossible or very hard to do. To add more things to Redis sounded like a bad idea, it does a lot of things already, and to cover messaging well I needed things which are very different than the way Redis operates. But why to design a new system given that the world is full of message brokers? Because an impressive number of users were using Redis instead of systems specifically designed for this goal, and this was strange. A few can be wrong, but so many need to get some reason. Maybe Redis low barrier of entry, easy API, speed, were not what most people were accustomed to when they looked at the message brokers landscape. It seems populated by solutions that are either too simple, asking the application to do too much, or too complex, but super full featured. Maybe there is some space for the “Redis of messaging”?
+&lt;br /&gt;
+&lt;br /&gt;~ Redis brutally forked ~
+&lt;br /&gt;
+&lt;br /&gt;For the first time in my life I didn’t started straight away to write code. For weeks I looked at the design from time to time, converted it into a new system and not a Redis client library, and tried to understand, as an user, what would make me very happy in a message broker. The original use case remained the same: delayed jobs. Disque is a general system, but 90% of times in the design the “reference” was an user that has to solve the problem of sending messages that are likely jobs to process. If something was against this use case, it was removed.
+&lt;br /&gt;
+&lt;br /&gt;When the design was ready, I finally started to code. But where to start? “vi main.c”? Fortunately Redis is, in part, a framework to write distributed systems in C. I had a protocol, network libraries, clients handling, node-to-node message bus. To rewrite all this from scratch sounded like a huge waste. At the same time I wanted Disque to be able to completely diverge from Redis in any details possible if this is needed, and I wanted it to be a side project without impacts on Redis itself. So instead of trying the huge undertake of splitting Redis into an actual separated framework, and the Redis implementation, I took a more pragmatic approach: I forked the code, and removed everything that was Redis specific from the source code, in order to end with a skeleton. At this point I was ready to implement my specification.
+&lt;br /&gt;
+&lt;br /&gt;~ What is Disque? ~
+&lt;br /&gt;
+&lt;br /&gt;After a few months of very non intense work and just 200 commits I’ve finally a system that no longer looks like a toy: it looked like a toy for many weeks so I was afraid of even talking about it, since the probability of me just deleting the source tree was big. Now that most of the idea is working code with tests, I’m finally sure this will be released in the future, and to talk about the tradeoffs I took in the design.
+&lt;br /&gt;
+&lt;br /&gt;Disque is a distributed system, by default. Since it is an AP system, it made no sense to have like in Redis a single-node mode and a distributed mode. A single Disque node is just a particular case of a cluster, having just one node.
+&lt;br /&gt;So this was of the important points in the design: fault tolerant, resistant to partitions, and available no matter how many nodes are still up, aka AP. I also wanted a system that was inherently able to scale in different scenarios, both when the issue is many producers and consumers with many queues, and when instead all this producers and consumers are all focusing on a single queue, that may be distributed into multiple nodes.
+&lt;br /&gt;
+&lt;br /&gt;My requirements were telling me aloud one thing… that Disque was going to make a big design sacrifice. Message ordering. Disque only provides best-effort ordering. However because of this sacrifice, there is a lot to gain… tradeoffs are interesting since sometimes they totally open the design space.
+&lt;br /&gt;
+&lt;br /&gt;I could continue recounting you what Disque is like that, however a few months ago I saw a comment in Hacker News, written by Jacques Chester, see https://news.ycombinator.com/item?id=8709146 [EDIT: SORRY I made an error cut&amp;amp;pasting the wrong name of Adrian (Hi Adrian, sorry for misquoting you!)]. Jacques, that happens to work for Pivotal like me, was commenting how different messaging systems have very different set of features, properties, and without the details it is almost impossible to evaluate the different choices, and to evaluate if one is faster than the other because it has a better implementation, or simple offers a lot less guarantees. So he wrote a set of questions one should ask when evaluating a messaging system. I’ll use his questions, and add a few more, in order to describe what Disque is, in the hope that I don’t end just hand waving, but providing some actual information.
+&lt;br /&gt;
+&lt;br /&gt;Q: Are messages delivered at least once?
+&lt;br /&gt;
+&lt;br /&gt;In Disque you can chose at least once delivery (the default), or at most once delivery. This property can be set per message. At most once delivery is just a special case of at least once delivery, setting the “retry” parameter of the message to 0, and replicating the message to a single node.
+&lt;br /&gt;
+&lt;br /&gt;Q: Are messages acknowledged by consumers?
+&lt;br /&gt;
+&lt;br /&gt;Yes, the only way for a consumer to tell the system the message got delivered correctly, is to acknowledge it.
+&lt;br /&gt;
+&lt;br /&gt;Q: Are messages delivered multiple times if not acknowledged?
+&lt;br /&gt;
+&lt;br /&gt;Yes, Disque will automatically deliver the message again, after a “retry” time, forever (up to the max TTL time for the message).
+&lt;br /&gt;When messages are acknowledged, the acknowledge is propagated to the nodes having a copy of the message. If the system believes everybody was reached, the message is finally garbage collected and removed. Acknowledged messages are also evicted during memory pressure.
+&lt;br /&gt;
+&lt;br /&gt;Nodes run a best-effort algorithm to avoid to queue the same message multiple times, in order to approximate single delivery better. However during failures, multiple nodes may re-deliver the same message multiple times at the same time.
+&lt;br /&gt;
+&lt;br /&gt;Q: Is queueing durable or ephemeral.
+&lt;br /&gt;
+&lt;br /&gt;Durable.
+&lt;br /&gt;
+&lt;br /&gt;Q: Is durability achieved by writing every message to disk first, or by replicating messages across servers?
+&lt;br /&gt;
+&lt;br /&gt;By default Disque runs in-memory only, and uses synchronous replication to achieve durability (however you can ask, per message, to use asynchronous replication). It is possible to turn AOF (similarly to Redis) if desired, if the setup is likely to see a mass-reboot or alike. When the system is upgraded it is possible to write the AOF on disk just for the upgrade in order to don’t lose the state after a restart even if normally disk persistence is not used.
+&lt;br /&gt;
+&lt;br /&gt;Q: Is queueing partially/totally consistent across a group of servers or divided up for maximal throughput?
+&lt;br /&gt;
+&lt;br /&gt;Divided up for throughput, however message ordering is preserved in a best-effort way. Each message has an immutable “ctime” which is a wall-clock milliseconds timestamp plus an incremental ID for messages generated in the same millisecond. Nodes use this ctime in order to sort messages for delivery.
+&lt;br /&gt;
+&lt;br /&gt;Q: Can messages be dropped entirely under pressure? (aka best effort)
+&lt;br /&gt;
+&lt;br /&gt;No, however new messages may be refused if there is no space in memory. When 75% of memory is in use, nodes receiving messages try to externally replicate them, just to outer nodes, without taking a copy, but it many not work if also the other nodes are in an out of memory condition.
+&lt;br /&gt;
+&lt;br /&gt;Q: Can consumers and producers look into the queue, or is it totally opaque?
+&lt;br /&gt;
+&lt;br /&gt;There are commands to “PEEK” into queues.
+&lt;br /&gt;
+&lt;br /&gt;Q: Is queueing unordered, FIFO or prioritised?
+&lt;br /&gt;
+&lt;br /&gt;Best-effort FIFO-ish as explained.
+&lt;br /&gt;
+&lt;br /&gt;Q: Is there a broker or no broker?
+&lt;br /&gt;
+&lt;br /&gt;Broker as a set of masters. Clients can talk to whatever node they want.
+&lt;br /&gt;
+&lt;br /&gt;Q: Does the broker own independent, named queues (topics, routes etc) or do producers and consumers need to coordinate their connections?
+&lt;br /&gt;
+&lt;br /&gt;Named queues. Producers and consumers does not need to coordinate, since nodes use federation to discover routes inside the cluster and pass messages as they are needed by consumers. However the client is provided with hints in case it is willing to relocate where more consumers are.
+&lt;br /&gt;
+&lt;br /&gt;Q: Is message posting transactional?
+&lt;br /&gt;
+&lt;br /&gt;Yes, once the command to add a message returns, the system guarantees that there are the desired number of copies inside the cluster.
+&lt;br /&gt;
+&lt;br /&gt;Q: Is message receiving transactional?
+&lt;br /&gt;
+&lt;br /&gt;I guess not, since Disque will try to deliver the same message again if not acknowledged.
+&lt;br /&gt;
+&lt;br /&gt;Q: Do consumers block on receive or can they check for new messages?
+&lt;br /&gt;
+&lt;br /&gt;Both behaviors are supported, by default it blocks.
+&lt;br /&gt;
+&lt;br /&gt;Q: Do producers block on send or can they check for queue fullness? 
+&lt;br /&gt;
+&lt;br /&gt;The producer may ask to get an error when adding a new message if the message length is already greater than a specified value in the local node it is pushing the message.
+&lt;br /&gt;
+&lt;br /&gt;Moreover the producer may ask to replicate the message asynchronously if it want to run away ASAP and let the cluster replicate the message in a best-effort way.
+&lt;br /&gt;
+&lt;br /&gt;There is no way to block the consumer if there are too many messages in the queue, and unblock it as soon as there are less messages.
+&lt;br /&gt;
+&lt;br /&gt;Q: Are delayed jobs supported?
+&lt;br /&gt;
+&lt;br /&gt;Yes, with second granularity, up to years. However they’ll use memory.
+&lt;br /&gt;
+&lt;br /&gt;Q: Can consumers and producers connect to different nodes?
+&lt;br /&gt;
+&lt;br /&gt;Yes.
+&lt;br /&gt;
+&lt;br /&gt;I hope with this post Disque is a bit less vaporware. Sure, without looking at the code it is hard to tell, but if your best feature is out you can already complain at least.
+&lt;br /&gt;How much of the above is already implemented and working well? Everything but AOF disk persistence, and a few minor things I want to refine in the API, so first release should not be too far, but working at it so rarely it is hard to get super fast.
+&lt;a href=&quot;http://antirez.com/news/88&quot;&gt;Comments&lt;/a&gt;</content>
+		<author>
+			<name>Antirez</name>
+			<uri>http://antirez.com</uri>
+		</author>
+		<source>
+			<title type="html">Antirez weblog</title>
+			<subtitle type="html">Description pending</subtitle>
+			<link rel="self" href="http://antirez.com/rss"/>
+			<id>http://antirez.com/rss</id>
+			<updated>2015-06-03T01:40:05+00:00</updated>
+		</source>
+	</entry>
+
+	<entry>
+		<title type="html">Redis Conference 2015</title>
+		<link href="http://antirez.com/news/87"/>
+		<id>http://antirez.com/news/87</id>
+		<updated>2015-06-03T01:40:05+00:00</updated>
+		<content type="html">I’m back home, after a non easy trip, since to travel from San Francisco to Sicily is kinda NP complete: there are no solutions involving less than three flights. However it was definitely worth it, because the Redis Conference 2015 was very good, SF was wonderful as usually and I was able to meet with many interesting people. Here I’ll limit myself to writing a short account of the conference, but the trip was also an incredible experience because I discovered old and new friends, that are not just smart programmers, but also people I could imagine being my friends here in Sicily. I never felt alone while I was 10k kilometers away from my home.
+&lt;br /&gt;
+&lt;br /&gt;The conference was organized by RackSpace in a magistral way, with RedisLabs, Heroku, and Hulu, sponsoring it as well. I can’t say thank you enough times to everybody. Many people traveled from different parts of US and outside US to SF just for a couple of days, the venue was incredibly cool, and everything organized in the finest details.
+&lt;br /&gt;
+&lt;br /&gt;There was even an incredible cake for the Redis 6th birthday :-)
+&lt;br /&gt;
+&lt;br /&gt;However the killer features of the conference were, the number and the quality of the attenders (mostly actual Redis users), around 250 people, and the quality of the talks. The conference was free, even if it did not looked like a free conference at all, at any level. An incredible stage where to talk, very high quality food, plenty of space. All this honestly helped to create a setup for interesting exchanges. Everybody was using Redis for something, to get actual things done, and a lot of people shared their experiences. Among the talks I found Hulu and Heroku ones extremely interesting, because they covered details about different use cases and operational challenges. I also happen to agree with Bill Andersen (from RackSpace) vision on benchmarking Redis in a use-case oriented fashion, even if I missed the initial part of his talk because I was being interviewed, but the cool thing is, there will be recordings of the talks, so it will be possible for everybody to watch them when available at the conf site, which is, http://redisconference.com
+&lt;br /&gt;
+&lt;br /&gt;I was approached by several VeryLargeCompanies recounting stories of how they are using or are going to use Redis to do VeryLargeUseCase. Basically at this point Redis is everywhere.
+&lt;br /&gt;
+&lt;br /&gt;Redis Conference was a big gift to the Redis community… and in some way it shows very well how much there is a Redis outside Redis, I mean, at this point it has a life outside the borders of the server and client libraries repositories. It is a technology with many users that exchange ideas and that work with it in different ways: internally to companies to provide it as a technology to cover a number of use cases, and also in the context of cloud providers, that are providing it as a service to other companies.
+&lt;br /&gt;
+&lt;br /&gt;One thing I did not liked was Matt Stancliff talk. He tried to uncover different problems in the Redis development process, and finally proposed the community to replace me as the project leader, with him. In my opinion what Matt actually managed to do was to cherry-pick from my IRC, Twitter and Github issues posts in a very unfair way, in order to provide a bad imagine of myself. I think this was a big mistake. Moreover he did the talk as the last talk, not providing a right to reply. Matt and I happen to be persons with very different visions in many ways, however Redis is a project I invested many years into, and I’m not going to change my vision, I’m actually afraid I merged some code under pressure that I now find non well written and designed.
+&lt;br /&gt;
+&lt;br /&gt;What prevents Redis for becoming a monoculture is its license, if the community at some point really believes it is possible to do much better, or simply to do things in a very different way, some forks will appear, and darwinian selection will work to make sure we have the best Redis possible. Technical leadership is a reward for the work you are capable to do, is not asked at conferences. Moreover technology is not just code, is also about human interactions, and life is too short to interact with people we don’t share the same fundamental values of what a good behavior is.
+&lt;br /&gt;
+&lt;br /&gt;Well, even if this left some bitter taste, overall the Redis Conference was a magical experience, and even Matt talk actually helped me to understand what to do in the future and what I want for this project. Thank you to who made it possible and to all the attenders, I hope to see you again next year.
+&lt;a href=&quot;http://antirez.com/news/87&quot;&gt;Comments&lt;/a&gt;</content>
+		<author>
+			<name>Antirez</name>
+			<uri>http://antirez.com</uri>
+		</author>
+		<source>
+			<title type="html">Antirez weblog</title>
+			<subtitle type="html">Description pending</subtitle>
+			<link rel="self" href="http://antirez.com/rss"/>
+			<id>http://antirez.com/rss</id>
+			<updated>2015-06-03T01:40:05+00:00</updated>
+		</source>
+	</entry>
+
+	<entry>
+		<title type="html">Side projects</title>
+		<link href="http://antirez.com/news/86"/>
+		<id>http://antirez.com/news/86</id>
+		<updated>2015-06-03T01:40:05+00:00</updated>
+		<content type="html">Today Redis is six years old. This is an incredible accomplishment for me, because in the past I switched to the next thing much faster. There are things that lasted six years in my past, but not like Redis, where after so much time, I still focus most of my everyday energies into.
+&lt;br /&gt;
+&lt;br /&gt;How did I stopped doing new things to focus into an unique effort, drastically monopolizing my professional life? It was a too big sacrifice to do, for an human being with a limited life span. Fortunately I simply never did this, I never stopped doing new things.
+&lt;br /&gt;
+&lt;br /&gt;If I look back at those 6 years, it was an endless stream of side projects, sometimes related to Redis, sometimes not.
+&lt;br /&gt;
+&lt;br /&gt;1) Load81, children programming environment.
+&lt;br /&gt;2) Dump1090, software defined radio ADS-B decoder.
+&lt;br /&gt;3) A Javascript ray tracer.
+&lt;br /&gt;4) lua-cmsgpack, C implementation of msgpack for Lua.
+&lt;br /&gt;5) linenoise line editing library. Used in Redis, but well, was not our top priority.
+&lt;br /&gt;6) lamernews, Redis-based HN clone.
+&lt;br /&gt;7) Gitan, a small Git web interface.
+&lt;br /&gt;8) shapeme, images evolver using simulated annealing.
+&lt;br /&gt;9) Disque, a distributed queue (work in progress right now).
+&lt;br /&gt;
+&lt;br /&gt;And there are much more throw-away projects not listed here.
+&lt;br /&gt;The interesting thing is that many of the projects listed above are not random hacking efforts that had as an unique goal to make me happy. A few found their way into other people’s code.
+&lt;br /&gt;
+&lt;br /&gt;Because of the side projects, I was able to do different things when I was stressed and impoverished from doing again and again the same thing. I could later refocus on Redis, and find again the right motivations to have fun with it, because small projects are cool, but to work for years at a single project can provide more value for others in the long run.
+&lt;br /&gt;
+&lt;br /&gt;So currently I’m using something like 20% of my time to hack on Disque, a distributed message queue. So only 80% is left for Redis development, right? Wrong. The deal is between 80% of focus on Redis and 20% on something else, or 0% of focus on Redis in the long term, because in order to have a long term engagement, you need a long term alternative to explore new things.
+&lt;br /&gt;
+&lt;br /&gt;Side projects are the projects making your bigger projects possible. Moreover they are often the start of new interesting projects. Redis itself was a side project of LLOOGG. Sometimes you stop working at your main project because of side projects, but when this happens it is not because your side project captured your focus, it is because you managed to find a better use for your time, since the side project is more important, interesting, and compelling than the main project.
+&lt;br /&gt;
+&lt;br /&gt;Redis is six years old today, but is aging well: it continues to capture the attention of more developers, and it continues to improve in order to provide a bit more value to users every week. However for me, more users, more pull requests, and more pressure, does not mean to change my setup. What Redis is today is the sum of the work we put into it, and the endurance in the course of six years. To continue along the same path, I’ll make sure to have a few side projects for the next years.
+&lt;br /&gt;
+&lt;br /&gt;UPDATE: Damian Janowski provided an incredible present for the Redis community today, the renewed Redis.io web site is online now! http://redis.io. Thanks Damian!
+&lt;br /&gt;
+&lt;br /&gt;HN comments here: https://news.ycombinator.com/item?id=9112250
+&lt;a href=&quot;http://antirez.com/news/86&quot;&gt;Comments&lt;/a&gt;</content>
+		<author>
+			<name>Antirez</name>
+			<uri>http://antirez.com</uri>
+		</author>
+		<source>
+			<title type="html">Antirez weblog</title>
+			<subtitle type="html">Description pending</subtitle>
+			<link rel="self" href="http://antirez.com/rss"/>
+			<id>http://antirez.com/rss</id>
+			<updated>2015-06-03T01:40:05+00:00</updated>
+		</source>
+	</entry>
+
+	<entry>
+		<title type="html">Why we don’t have benchmarks comparing Redis with other DBs</title>
+		<link href="http://antirez.com/news/85"/>
+		<id>http://antirez.com/news/85</id>
+		<updated>2015-06-03T01:40:05+00:00</updated>
+		<content type="html">Redis speed could be one selling point for new users, so following the trend of comparative “advertising” it should be logical to have a few comparisons at Redis.io. However there are two problems with this. One is of goals: I don’t want to convince developers to adopt Redis, we just do our best in order to provide a suitable product, and we are happy if people can get work done with it, that’s where my marketing wishes end. There is more: it is almost always impossible to compare different systems in a fair way.
+&lt;br /&gt;
+&lt;br /&gt;When you compare two databases, to get fair numbers, they need to share *a lot*: data model, exact durability guarantees, data replication safety, availability during partitions, and so forth: often a system will score in a lower way than another system since it sacrifices speed to provide less “hey look at me” qualities but that are very important nonetheless. Moreover the testing suite is a complex matter as well unless different database systems talk the same exact protocol: differences in the client library alone can contribute for large differences.
+&lt;br /&gt;
+&lt;br /&gt;However there are people that beg to differ, and believe comparing different database systems for speed is a good idea anyway. For example, yesterday a benchmark of Redis and AerospikeDB was published here: http://lynnlangit.com/2015/01/28/lessons-learned-benchmarking-nosql-on-the-aws-cloud-aerospikedb-and-redis/.
+&lt;br /&gt;
+&lt;br /&gt;I’ll use this benchmark to show my point about how benchmarks are misleading beasts. In the benchmark huge EC2 instances are used, for some strange reason, since the instances are equipped with 244 GB of RAM (!). Those are R3.8xlarge instances. For my tests I’ll use a more real world m3.medium instance.
+&lt;br /&gt;
+&lt;br /&gt;Using such a beast of an instance Redis scored, in the single node case, able to provide 128k ops per second. My EC2 instance is much more limited, testing from another EC2 instance with Redis benchmark, not using pipelining, and with the same 100 bytes data size, I get 32k ops/sec, so my instance is something like 4 times slower, in the single process case.
+&lt;br /&gt;
+&lt;br /&gt;Let’s see with Redis INFO command how the system is using the CPU during this benchmark:
+&lt;br /&gt;
+&lt;br /&gt;# CPU
+&lt;br /&gt;used_cpu_sys:181.78
+&lt;br /&gt;used_cpu_user:205.05
+&lt;br /&gt;used_cpu_sys_children:0.12
+&lt;br /&gt;used_cpu_user_children:0.87
+&lt;br /&gt;127.0.0.1:6379&gt; info cpu
+&lt;br /&gt;
+&lt;br /&gt;… after 10 seconds of test …
+&lt;br /&gt;
+&lt;br /&gt;# CPU
+&lt;br /&gt;used_cpu_sys:184.52
+&lt;br /&gt;used_cpu_user:206.42
+&lt;br /&gt;used_cpu_sys_children:0.12
+&lt;br /&gt;used_cpu_user_children:0.87
+&lt;br /&gt;
+&lt;br /&gt;Redis spent ~ 3 seconds of system time, and only ~ 1.5 seconds in user space. What happens here is that for each request the biggest part of the work is to perform the read() and write() call. Also since it’s one-query one-reply workload for each client, we pay a full RTT for each request of each client.
+&lt;br /&gt;
+&lt;br /&gt;Now let’s check what happens if I use pipelining instead, a feature very known and much exploited by Redis users, since it’s the only way to maximize the server usage, and there are usually a number of places in the application where you can perform multiple operations at a given time.
+&lt;br /&gt;
+&lt;br /&gt;With a pipeline of 32 operations the numbers changed drastically. My tiny instance was able to deliver 250k ops/sec using a single core, which is 25% of the *top* result using 32 (each faster) cores in the mentioned benchmark.
+&lt;br /&gt;
+&lt;br /&gt;Let’s look at the CPU time:
+&lt;br /&gt;
+&lt;br /&gt;# CPU
+&lt;br /&gt;used_cpu_sys:189.16
+&lt;br /&gt;used_cpu_user:216.46
+&lt;br /&gt;used_cpu_sys_children:0.12
+&lt;br /&gt;used_cpu_user_children:0.87
+&lt;br /&gt;127.0.0.1:6379&gt; info cpu
+&lt;br /&gt;
+&lt;br /&gt;… after 10 seconds of test …
+&lt;br /&gt;
+&lt;br /&gt;# CPU
+&lt;br /&gt;used_cpu_sys:190.60
+&lt;br /&gt;used_cpu_user:224.92
+&lt;br /&gt;used_cpu_sys_children:0.12
+&lt;br /&gt;used_cpu_user_children:0.87
+&lt;br /&gt;
+&lt;br /&gt;This time we are actually using the database engine to serve queries with our CPU, we are not just losing much of the time context switching. We used ~1.5 seconds of system time, and 8.46 seconds into the Redis process itself.
+&lt;br /&gt;
+&lt;br /&gt;Using lower numbers in the pipeline gets us results in the middle. Pipeline of 4 = 100k ops/sec (that should translate to ~ 400k ops/sec in the bigger instance used in the benchmark), pipeline 8 = 180k ops/sec, and so forth.
+&lt;br /&gt;
+&lt;br /&gt;So basically it is not a coincidence that benchmarking Redis and AerospikeDB in this way we get remarkably similar results. More or less you are not testing the databases, but the network stack and the kernel. If the DB can serve queries using a read and a write system call without any other huge waste, this is what we get, and here the time to serve the actual query is small since we are talking about data fitting into memory (just a note, 10M keys of 100k in Redis will use a fraction of the memory that was allocated in those instances).
+&lt;br /&gt;
+&lt;br /&gt;However there is more about that. What about the operations we can perform? To test Redis doing GET/SET is like to test a Ferrari checking how good it is at cleaning the mirror when it rains.
+&lt;br /&gt;
+&lt;br /&gt;A fundamental part of the Redis architecture is that largely different operations have similar costs, so what about our huge Facebook game posting scores of the finished games to create the leaderboard?
+&lt;br /&gt;
+&lt;br /&gt;The same single process can do 110k ops/sec when the query is: ZADD myscores  .
+&lt;br /&gt;
+&lt;br /&gt;But let’s demand more, what about estimating the cardinality with the HyperLogLog, at the same time adding new elements and reading the current guess with two redis-benchmark processes? Set size is 10 millions again. So during this test I spawned a benchmark executing PFADD with random elements of the set, and another doing PFCOUNT at the same time in the same HyperLogLog. Both scored simultaneously at 250k ops/sec, for a total of half a million ops per second with a single Redis process.
+&lt;br /&gt;
+&lt;br /&gt;In Redis doing complex operations is similar to pipelining. You want to do *more* for each read/write, otherwise your performance is dominated by I/O.
+&lt;br /&gt;
+&lt;br /&gt;Ok, so a few useful remarks. 1) GET/SET Benchmarks are not a great way to compare different database systems. 2) A better performance comparison is by use case. You say, for a given specific use case, using different data model, schema, queries, strategies, how much instances I need to handle the same traffic for the same app with two different database systems? 3) Test with instance types most people are going to actually use, huge instance types can mask inefficiencies of certain database systems, and is anyway not what most people are going to use.
+&lt;br /&gt;
+&lt;br /&gt;We’ll continue to optimize Redis for speed, and will continue to avoid posting comparative benchmarks.
+&lt;br /&gt;
+&lt;br /&gt;[Thanks to Amazon AWS for providing me free access to EC2]
+&lt;a href=&quot;http://antirez.com/news/85&quot;&gt;Comments&lt;/a&gt;</content>
+		<author>
+			<name>Antirez</name>
+			<uri>http://antirez.com</uri>
+		</author>
+		<source>
+			<title type="html">Antirez weblog</title>
+			<subtitle type="html">Description pending</subtitle>
+			<link rel="self" href="http://antirez.com/rss"/>
+			<id>http://antirez.com/rss</id>
+			<updated>2015-06-03T01:40:05+00:00</updated>
+		</source>
+	</entry>
+
+	<entry>
+		<title type="html">Redis latency spikes and the Linux kernel: a few more details</title>
+		<link href="http://antirez.com/news/84"/>
+		<id>http://antirez.com/news/84</id>
+		<updated>2015-06-03T01:40:05+00:00</updated>
+		<content type="html">Today I was testing Redis latency using m3.medium EC2 instances. I was able to replicate the usual latency spikes during BGSAVE, when the process forks, and the child starts saving the dataset on disk. However something was not as expected. The spike did not happened because of disk I/O, nor during the fork() call itself.
+&lt;br /&gt;
+&lt;br /&gt;The test was performed with a 1GB of data in memory, with 150k writes per second originating from a different EC2 instance, targeting 5 million keys (evenly distributed). The pipeline was set to 4 commands. This translates to the following command line of redis-benchmark:
+&lt;br /&gt;
+&lt;br /&gt;    ./redis-benchmark -P 4 -t set -r 5000000 -n 1000000000
+&lt;br /&gt;
+&lt;br /&gt;Every time BGSAVE was triggered, I could see ~300 milliseconds latency spikes of unknown origin, since fork was taking 6 milliseconds. Fortunately Redis has a software watchdog feature, that is able to produce a stack trace of the process during a latency event. It’s quite a simple trick but works great: we setup a SIGALRM to be delivered by the kernel. Each time the serverCron() function is called, the scheduled signal is cleared, so actually Redis never receives it if the control returns fast enough to the Redis process. If instead there is a blocking condition, the signal is delivered by the kernel, and the signal handler prints the stack trace.
+&lt;br /&gt;
+&lt;br /&gt;Instead of getting stack traces with the fork call, the process was always blocked near MOV* operations happening in the context of the parent process just after the fork. I started to develop the theory that Linux was “lazy forking” in some way, and the actual heavy stuff was happening later when memory was accessed and pages had to be copy-on-write-ed.
+&lt;br /&gt;
+&lt;br /&gt;Next step was to read the fork() implementation of the Linux kernel. What the system call does is indeed to copy all the mapped regions (vm_area_struct structures). However a traditional implementation would also duplicate the PTEs at this point, and this was traditionally performed by copy_page_range(). However something changed… as an optimization years ago: now Linux does not just performs lazy page copying, as most modern kernels. The PTEs are also copied in a lazy way on faults. Here is the top comment of copy_range_range():
+&lt;br /&gt;
+&lt;br /&gt;         * Don't copy ptes where a page fault will fill them correctly.
+&lt;br /&gt;         * Fork becomes much lighter when there are big shared or private
+&lt;br /&gt;         * readonly mappings. The tradeoff is that copy_page_range is more
+&lt;br /&gt;         * efficient than faulting.
+&lt;br /&gt;
+&lt;br /&gt;Basically as soon as the parent process performs an access in the shared regions with the child process, during the page fault Linux does the big amount of work skipped by fork, and this is why I could see always a MOV instruction in the stack trace.
+&lt;br /&gt;
+&lt;br /&gt;While this behavior is not good for Redis, since to copy all the PTEs in a single operation is more efficient, it is much better for the traditional use case of fork() on POSIX systems, which is, fork()+exec*() in order to spawn a new process.
+&lt;br /&gt;
+&lt;br /&gt;This issue is not EC2 specific, however virtualized instances are slower at copying PTEs, so the problem is less noticeable with physical servers.
+&lt;br /&gt;
+&lt;br /&gt;However this is definitely not the full story. While I was testing this stuff in my Linux box, I remembered that using the libc malloc, instead of jemalloc, in  certain conditions I was able to measure less latency spikes in the past. So I tried to check if there was some relation with that.
+&lt;br /&gt;
+&lt;br /&gt;Indeed compiling with MALLOC=libc I was not able to measure any latency in the physical server, while with jemalloc I could observe the same behavior observed with the EC2 instance. To understand better the difference I setup a test with 15 million keys and a larger pipeline in order to stress more the system and make more likely that page faults of all the mmaped regions could happen in a very small interval of time. Then I repeated the same test with jemalloc and libc malloc:
+&lt;br /&gt;
+&lt;br /&gt;bare metal, 675k/sec writes to 15 million keys, jemalloc: max spike 339 milliseconds.
+&lt;br /&gt;bare metal, 675k/sec writes to 15 million keys, malloc: max spike 21 milliseconds.
+&lt;br /&gt;
+&lt;br /&gt;I quickly tried to replicate the same result with EC2, same stuff, the spike was a fraction with malloc.
+&lt;br /&gt;
+&lt;br /&gt;The next logical thing after this findings is to inspect what is the difference in the memory layout of a Redis system running with libc malloc VS one running with jemalloc. The Linux proc filesystem is handy to investigate the process internals (in this case I used /proc//smaps file).
+&lt;br /&gt;
+&lt;br /&gt;Jemalloc memory is allocated in this region:
+&lt;br /&gt;
+&lt;br /&gt;7f8002c00000-7f8062400000 rw-p 00000000 00:00 0
+&lt;br /&gt;Size:            1564672 kB
+&lt;br /&gt;Rss:             1564672 kB
+&lt;br /&gt;Pss:             1564672 kB
+&lt;br /&gt;Shared_Clean:          0 kB
+&lt;br /&gt;Shared_Dirty:          0 kB
+&lt;br /&gt;Private_Clean:         0 kB
+&lt;br /&gt;Private_Dirty:   1564672 kB
+&lt;br /&gt;Referenced:      1564672 kB
+&lt;br /&gt;Anonymous:       1564672 kB
+&lt;br /&gt;AnonHugePages:   1564672 kB
+&lt;br /&gt;Swap:                  0 kB
+&lt;br /&gt;KernelPageSize:        4 kB
+&lt;br /&gt;MMUPageSize:           4 kB
+&lt;br /&gt;Locked:                0 kB
+&lt;br /&gt;VmFlags: rd wr mr mw me ac sd
+&lt;br /&gt;
+&lt;br /&gt;While libc big region looks like this:
+&lt;br /&gt;
+&lt;br /&gt;0082f000-8141c000 rw-p 00000000 00:00 0                                  [heap]
+&lt;br /&gt;Size:            2109364 kB
+&lt;br /&gt;Rss:             2109276 kB
+&lt;br /&gt;Pss:             2109276 kB
+&lt;br /&gt;Shared_Clean:          0 kB
+&lt;br /&gt;Shared_Dirty:          0 kB
+&lt;br /&gt;Private_Clean:         0 kB
+&lt;br /&gt;Private_Dirty:   2109276 kB
+&lt;br /&gt;Referenced:      2109276 kB
+&lt;br /&gt;Anonymous:       2109276 kB
+&lt;br /&gt;AnonHugePages:         0 kB
+&lt;br /&gt;Swap:                  0 kB
+&lt;br /&gt;KernelPageSize:        4 kB
+&lt;br /&gt;MMUPageSize:           4 kB
+&lt;br /&gt;Locked:                0 kB
+&lt;br /&gt;VmFlags: rd wr mr mw me ac sd
+&lt;br /&gt;
+&lt;br /&gt;Looks like here there are a couple different things.
+&lt;br /&gt;
+&lt;br /&gt;1) There is [heap] in the first line only for libc malloc.
+&lt;br /&gt;2) AnonHugePages field is zero for libc malloc but is set to the size of the region in the case of jemalloc.
+&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;Basically, the difference in latency appears to be due to the fact that malloc is using transparent huge pages, a kernel feature that allows to transparently glue multiple normal 4k pages into a few huge pages, which are 2048k each. This in turn means that copying the PTEs for this regions is much faster.
+&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;EDIT: Unfortunately I just spotted that I'm totally wrong, the huge pages apparently are only used by jemalloc: I just mis-read the outputs since this seemed so obvious. So on the contrary, it appears that the high latency is due to the huge pages thing for some unknown reason. So actually it is malloc that, while NOT using huge pages, is going much faster. I've no idea about what is happening here, so please disregard the above conclusions.
+&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;Meanwhile for low latency applications you may want to build Redis with “make MALLOC=libc”, however make sure to use “make distclean” before, and be aware that depending on the work load, libc malloc suffers fragmentation more than jemalloc.
+&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;More news soon…
+&lt;br /&gt;
+&lt;br /&gt;EDIT2: Oh wait... since the problem is huge pages, this is MUCH better, since we can disable it. And I just verified that it works:
+&lt;br /&gt;
+&lt;br /&gt;echo never &gt; /sys/kernel/mm/transparent_hugepage/enabled
+&lt;br /&gt;
+&lt;br /&gt;This is the new Redis mantra apparently.
+&lt;br /&gt;
+&lt;br /&gt;UPDATE: While this seemed unrealistic to me, I experimentally verified that the huge pages memory spike is due to the fact that with 50 clients writing at the same time, with N queued requests each, the Redis process can touch in the space of *a single event loop iteration* all the process pages, so its copy-on-writing the entire process address space. This means that not only huge pages are horrible for latency, but that are also horrible for memory usage.
+&lt;a href=&quot;http://antirez.com/news/84&quot;&gt;Comments&lt;/a&gt;</content>
+		<author>
+			<name>Antirez</name>
+			<uri>http://antirez.com</uri>
+		</author>
+		<source>
+			<title type="html">Antirez weblog</title>
+			<subtitle type="html">Description pending</subtitle>
+			<link rel="self" href="http://antirez.com/rss"/>
+			<id>http://antirez.com/rss</id>
+			<updated>2015-06-03T01:40:05+00:00</updated>
+		</source>
+	</entry>
 
 </feed>
