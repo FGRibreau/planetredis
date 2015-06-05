@@ -5,7 +5,7 @@
 	<link rel="self" href="http://www.planetredis.org/atom.xml"/>
 	<link href="http://www.planetredis.org/"/>
 	<id>http://www.planetredis.org/atom.xml</id>
-	<updated>2015-06-05T18:10:06+00:00</updated>
+	<updated>2015-06-05T18:20:08+00:00</updated>
 	<generator uri="http://www.planetplanet.org/">Planet/2.0 +http://www.planetplanet.org</generator>
 
 	<entry>
@@ -131,7 +131,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-05T18:10:04+00:00</updated>
+			<updated>2015-06-05T18:20:06+00:00</updated>
 		</source>
 	</entry>
 
@@ -167,7 +167,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-05T18:10:04+00:00</updated>
+			<updated>2015-06-05T18:20:06+00:00</updated>
 		</source>
 	</entry>
 
@@ -216,7 +216,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-05T18:10:04+00:00</updated>
+			<updated>2015-06-05T18:20:06+00:00</updated>
 		</source>
 	</entry>
 
@@ -306,7 +306,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-05T18:10:04+00:00</updated>
+			<updated>2015-06-05T18:20:06+00:00</updated>
 		</source>
 	</entry>
 
@@ -421,7 +421,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-05T18:10:04+00:00</updated>
+			<updated>2015-06-05T18:20:06+00:00</updated>
 		</source>
 	</entry>
 
@@ -455,7 +455,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
 			<subtitle type="html">The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
 			<link rel="self" href="http://blog.pivotal.io/tag/redis/feed"/>
 			<id>http://blog.pivotal.io/tag/redis/feed</id>
-			<updated>2015-06-05T16:20:07+00:00</updated>
+			<updated>2015-06-05T18:20:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -497,7 +497,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
 			<subtitle type="html">The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
 			<link rel="self" href="http://blog.pivotal.io/tag/redis/feed"/>
 			<id>http://blog.pivotal.io/tag/redis/feed</id>
-			<updated>2015-06-05T16:20:07+00:00</updated>
+			<updated>2015-06-05T18:20:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -540,7 +540,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
 			<subtitle type="html">The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
 			<link rel="self" href="http://blog.pivotal.io/tag/redis/feed"/>
 			<id>http://blog.pivotal.io/tag/redis/feed</id>
-			<updated>2015-06-05T16:20:07+00:00</updated>
+			<updated>2015-06-05T18:20:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -571,7 +571,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
 			<subtitle type="html">The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
 			<link rel="self" href="http://blog.pivotal.io/tag/redis/feed"/>
 			<id>http://blog.pivotal.io/tag/redis/feed</id>
-			<updated>2015-06-05T16:20:07+00:00</updated>
+			<updated>2015-06-05T18:20:08+00:00</updated>
 		</source>
 	</entry>
 
@@ -643,7 +643,7 @@ Sure. In my spare time I like to spend time with friends and family. I also very
 			<subtitle type="html">The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
 			<link rel="self" href="http://blog.pivotal.io/tag/redis/feed"/>
 			<id>http://blog.pivotal.io/tag/redis/feed</id>
-			<updated>2015-06-05T16:20:07+00:00</updated>
+			<updated>2015-06-05T18:20:08+00:00</updated>
 		</source>
 	</entry>
 
