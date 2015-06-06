@@ -5,7 +5,7 @@
 	<link rel="self" href="http://www.planetredis.org/atom.xml"/>
 	<link href="http://www.planetredis.org/"/>
 	<id>http://www.planetredis.org/atom.xml</id>
-	<updated>2015-06-06T13:50:06+00:00</updated>
+	<updated>2015-06-06T14:00:06+00:00</updated>
 	<generator uri="http://www.planetplanet.org/">Planet/2.0 +http://www.planetplanet.org</generator>
 
 	<entry>
@@ -131,7 +131,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-06T13:50:05+00:00</updated>
+			<updated>2015-06-06T14:00:05+00:00</updated>
 		</source>
 	</entry>
 
@@ -167,7 +167,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-06T13:50:05+00:00</updated>
+			<updated>2015-06-06T14:00:05+00:00</updated>
 		</source>
 	</entry>
 
@@ -216,7 +216,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-06T13:50:05+00:00</updated>
+			<updated>2015-06-06T14:00:05+00:00</updated>
 		</source>
 	</entry>
 
@@ -306,7 +306,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-06T13:50:05+00:00</updated>
+			<updated>2015-06-06T14:00:05+00:00</updated>
 		</source>
 	</entry>
 
@@ -421,7 +421,7 @@
 			<subtitle type="html">Description pending</subtitle>
 			<link rel="self" href="http://antirez.com/rss"/>
 			<id>http://antirez.com/rss</id>
-			<updated>2015-06-06T13:50:05+00:00</updated>
+			<updated>2015-06-06T14:00:05+00:00</updated>
 		</source>
 	</entry>
 
