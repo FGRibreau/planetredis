@@ -4,11 +4,12 @@
 	<title><TMPL_VAR name></title>
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 	<meta name="robots" content="index,follow" />
-	<link rel="stylesheet" type="text/css" href="css/style.css" />
+	<link rel="stylesheet" type="text/css" href="style.css" />
 	<link rel="alternate" type="application/rss+xml" href="<TMPL_VAR link>rss20.xml" title="<TMPL_VAR name> RSS" />
-	<script src="/css/yui-combined.min.js"></script>
-	<script src="/css/core.js"></script>
+	<script src="//assets.ubuntu.com/sites/ubuntu/latest/u/js/plugins/yui-combined.min.js"></script>
+	<script src="//assets.ubuntu.com/sites/ubuntu/latest/u/js/core.js"></script>
 	<link rel="stylesheet" type="text/css" media="all" href="//fonts.googleapis.com/css?family=Ubuntu:300,400,400italic" />
+	<script src="//assets.ubuntu.com/sites/ubuntu/latest/u/js/global.js"></script>
 </head>
 
 <body class="blog">
@@ -32,9 +33,17 @@
 
 <TMPL_LOOP Items>
 
+	<TMPL_IF new_date>
+		<h3 id="todaysDate"><TMPL_VAR new_date></h3>
+	</TMPL_IF>
+
 	<div class="hentry post">
 		<div class="postHeader">
+<TMPL_IF channel_face>
+	<img class="face" src="heads/<TMPL_VAR channel_face ESCAPE="HTML">" alt="">
+<TMPL_ELSE>
 	<img class="face" src="images/nobody.png" alt="">
+</TMPL_IF>
 
 			<h2 class="entry-title"><a href="<TMPL_VAR link ESCAPE="HTML">" title="<TMPL_VAR channel_title_plain ESCAPE="HTML">"><TMPL_VAR title></a></h2>
 
@@ -58,7 +67,7 @@
 		<div id="secondary" class="aside main-aside">
 			<ul class="xoxo">
 				<li class="widgetcontainer widget_text">
-					<h3 class="widgettitle">About the Community Redis Blog Aggregator</h3>
+          <h3 class="widgettitle">About the Community Redis Blog Aggregator</h3>
 					<p>This website is a community-maintained and inclusive feed of Redis-related blog posts. To add your blog's feed, please fork <a href="https://github.com/xaprb/planetredis">the repository</a>, modify the config.ini file to add your feed at the end, and submit a pull request.</p>
 				</li>
 				<li class="widgetcontainer widget_extended-categories">
@@ -80,7 +89,7 @@
 <div id="footer">
 	<div id="siteinfo">
 		<p>
-			&copy; <a href="https://vividcortex.com/">VividCortex</a><br />
+      &copy; <a href="https://vividcortex.com/">VividCortex</a><br />
 			Blog entries aggregated on this page are owned by, and represent the opinion of the author. Header image courtesy of <a href="https://www.flickr.com/photos/will_spark/8602965477">will_spark</a> on Flickr, CC-licensed. Theme/template derived from Planet Ubuntu's. Powered by <a href="http://planetplanet.org">Planet Planet</a>.<br />
 		</p>
 	</div><!-- #siteinfo -->
