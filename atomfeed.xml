@@ -1,0 +1,1477 @@
+<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:planet="http://planet.intertwingly.net/" xmlns:indexing="urn:atom-extension:indexing" indexing:index="no"><access:restriction xmlns:access="http://www.bloglines.com/about/specs/fac-1.0" relationship="deny"/>
+  <title>Community Redis Aggregator</title>
+  <updated>2015-06-09T19:16:54Z</updated>
+  <generator uri="http://intertwingly.net/code/venus/">Venus</generator>
+  <author>
+    <name>Baron Schwartz</name>
+    <email>baron.schwartz@gmail.com</email>
+  </author>
+  <id>http://www.planetredis.org/atomfeed.xml</id>
+  <link href="http://www.planetredis.org/atomfeed.xml" rel="self" type="application/atom+xml"/>
+  <link href="http://www.planetredis.org/" rel="alternate"/>
+
+  <entry xml:lang="en-us">
+    <id>https://vividcortex.com/about-us/events/web-performance-meetup/</id>
+    <link href="https://vividcortex.com/about-us/events/web-performance-meetup/" rel="alternate" type="text/html"/>
+    <title>Boston Web Performance Group: Sampling is Hard</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Are you trying to scale performance monitoring? Interested in the complexities of data sampling?</p>
+
+<p>If you are in the Boston area Wednesday, June 10th, stop by Akamai HQ for an evening of pizza and tech.</p>
+
+<p>Ben Clark, the chief architect at Wayfair, will open with a brief talk about how Wayfair is scaling performance monitoring.</p>
+
+<p>Baron Schwartz will then discuss solutions VividCortex uses to effectively sample streams of data for more effective monitoring.</p>
+
+<p>Click <a href="http://www.meetup.com/Web-Performance-Boston/events/222697310/">here</a> for more details and registration.</p></div>
+    </summary>
+    <updated>2015-06-10T00:00:00Z</updated>
+    <source>
+      <id>https://vividcortex.com/</id>
+      <author>
+        <name>Vivid Cortex</name>
+      </author>
+      <link href="https://vividcortex.com/" rel="alternate" type="text/html"/>
+      <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
+      <subtitle>Recent content on VividCortex</subtitle>
+      <title>VividCortex</title>
+      <updated>2015-06-09T19:16:54Z</updated>
+    </source>
+  </entry>
+
+  <entry>
+    <id>http://antirez.com/news/77</id>
+    <link href="http://antirez.com/news/77" rel="alternate" type="text/html"/>
+    <title>A proposal for more reliable locks using Redis</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">-----------------
+<br/>UPDATE: The algorithm is now described in the Redis documentation here =&gt; http://redis.io/topics/distlock. The article is left here in its older version, the updates will go into the Redis documentation instead.
+<br/>-----------------
+<br/>
+<br/>Many people use Redis to implement distributed locks. Many believe that this is a great use case, and that Redis worked great to solve an otherwise hard to solve problem. Others believe that this is totally broken, unsafe, and wrong use case for Redis.
+<br/>
+<br/>Both are right, basically. Distributed locks are not trivial if we want them to be safe, and at the same time we demand high availability, so that Redis nodes can go down and still clients are able to acquire and release locks. At the same time a fast lock manager can solve tons of problems which are otherwise hard to solve in practice, and sometimes even a far from perfect solution is better than a very slow solution.
+<br/>
+<br/>Can we have a fast and reliable system at the same time based on Redis? This blog post is an exploration in this area. I’ll try to describe a proposal for a simple algorithm to use N Redis instances for distributed and reliable locks, in the hope that the community may help me analyze and comment the algorithm to see if this is a valid candidate.
+<br/>
+<br/># What we really want?
+<br/>
+<br/>Talking about a distributed system without stating the safety and liveness properties we want is mostly useless, because only when those two requirements are specified it is possible to check if a design is correct, and for people to analyze and find bugs in the design. We are going to model our design with just three properties, that are what I believe the minimum guarantees you need to use distributed locks in an effective way.
+<br/>
+<br/>1) Safety property: Mutual exclusion. At any given moment, only one client can hold a lock.
+<br/>
+<br/>2) Liveness property A: Deadlocks free. Eventually it is always possible to acquire a lock, even if the client that locked a resource crashed or gets partitioned.
+<br/>
+<br/>3) Liveness property B: Fault tolerance. As long as the majority of Redis nodes are up, clients are able to acquire and release locks.
+<br/>
+<br/># Distributed locks, the naive way.
+<br/>
+<br/>To understand what we want to improve, let’s analyze the current state of affairs.
+<br/>
+<br/>The simple way to use Redis to lock a resource is to create a key into an instance. The key is usually created with a limited time to live, using Redis expires feature, so that eventually it gets released one way or the other (property 2 in our list). When the client needs to release the resource, it deletes the key.
+<br/>
+<br/>Superficially this works well, but there is a problem: this is a single point of failure in our architecture. What happens if the Redis master goes down?
+<br/>Well, let’s add a slave! And use it if the master is unavailable. This is unfortunately not viable. By doing so we can’t implement our safety property of the mutual exclusion, because Redis replication is asynchronous.
+<br/>
+<br/>This is an obvious race condition with this model:
+<br/>
+<br/>1) Client A acquires the lock into the master.
+<br/>
+<br/>2) The master crashes before the write to the key is transmitted to the slave.
+<br/>
+<br/>3) The slave gets promoted to master.
+<br/>
+<br/>4) Client B acquires the lock to the same resource A already holds a lock for. &lt;- SAFETY VIOLATION!
+<br/>
+<br/>Sometimes it is perfectly fine that under special circumstances, like during a failure, multiple clients can hold the lock at the same time.
+<br/>If this is the case, stop reading and enjoy your replication based solution. Otherwise keep reading for a hopefully safer way to implement it.
+<br/>
+<br/># First, let’s do it correctly with one instance.
+<br/>
+<br/>Before to try to overcome the limitation of the single instance setup described above, let’s check how to do it correctly in this simple case, since this is actually a viable solution in applications where a race condition from time to time is acceptable, and because locking into a single instance is the foundation we’ll use for the distributed algorithm described here.
+<br/>
+<br/>To acquire the lock, the way to go is the following:
+<br/>
+<br/>SET resource_name my_random_value NX PX 30000
+<br/>
+<br/>The command will set the key only if it does not already exist (NX option), with an expire of 30000 milliseconds (PX option).
+<br/>The key is set to a value “my_random_value”. This value requires to be unique across all the clients and all the locks requests.
+<br/>
+<br/>Basically the random value is used in order to release the lock in a safe way, with a script that tells Redis: remove the key only if exists and the value stored at the key is exactly the one I expect to be. This is accomplished by the following Lua script:
+<br/>
+<br/>if redis.call("get",KEYS[1]) == ARGV[1] then
+<br/>    return redis.call("del",KEYS[1])
+<br/>else
+<br/>    return 0
+<br/>end
+<br/>
+<br/>This is important in order to avoid removing a lock that was created by another client. For example a client may acquire the lock, get blocked into some operation for longer than the lock validity time (the time at which the key will expire), and later remove the lock, that was already acquired by some other client.
+<br/>Using just DEL is not safe as a client may remove the lock of another client. With the above script instead every lock is “signed” with a random string, so the lock will be removed only if it is still the one that was set by the client trying to remove it.
+<br/>
+<br/>What this random string should be? I assume it’s 20 bytes from /dev/urandom, but you can find cheaper ways to make it unique enough for your tasks.
+<br/>For example a safe pick is to seed RC4 with /dev/urandom, and generate a pseudo random stream from that.
+<br/>A simpler solution is to use a combination of unix time with microseconds resolution, concatenating it with a client ID, it is not as safe, but probably up to the task in most environments.
+<br/>
+<br/>The time we use as the key time to live, is called the “lock validity time”. It is both the auto release time, and the time the client has in order to perform the operation required before another client may be able to acquire the lock again, without technically violating the mutual exclusion guarantee, which is only limited to a given window of time from the moment the lock is acquired.
+<br/>
+<br/>So now we have a good way to acquire and release the lock. The system, reasoning about a non-distrubited system which is composed of a single instance, always available, is safe. Let’s extend the concept to a distributed system where we don’t have such guarantees.
+<br/>
+<br/># Distributed version
+<br/>
+<br/>In the distributed version of the algorithm we assume to have N Redis masters. Those nodes are totally independent, so we don’t use replication or any other implicit coordination system. We already described how to acquire and release the lock safely in a single instance. We give for granted that the algorithm will use this method to acquire and release the lock in a single instance. In our examples we set N=5, which is a reasonable value, so we need to run 5 Redis masters in different computers or virtual machines in order to ensure that they’ll fail in a mostly independent way.
+<br/>
+<br/>In order to acquire the lock, the client performs the following operations:
+<br/>
+<br/>Step 1) It gets the current time in milliseconds.
+<br/>
+<br/>Step 2) It tries to acquire the lock in all the N instances sequentially, using the same key name and random value in all the instances.
+<br/>
+<br/>During the step 2, when setting the lock in each instance, the client uses a timeout which is small compared to the total lock auto-release time in order to acquire it.
+<br/>For example if the auto-release time is 10 seconds, the timeout could be in the ~ 5-50 milliseconds range.
+<br/>This prevents the client to remain blocked for a long time trying to talk with a Redis node which is down: if an instance is not available, we should try to talk with the next instance ASAP.
+<br/>
+<br/>Step 3) The client computes how much time elapsed in order to acquire the lock, by subtracting to the current time the timestamp obtained in step 1.
+<br/>If and only if the client was able to acquire the lock in the majority of the instances (at least 3), and the total time elapsed to acquire the lock is less than lock validity time, the lock is considered to be acquired.
+<br/>
+<br/>Step 4) If the lock was acquired, its validity time is considered to be the initial validity time minus the time elapsed, as computed in step 3.
+<br/>
+<br/>Step 5) If the client failed to acquire the lock for some reason (either it was not able to lock N/2+1 instances or the validity time is negative), it will try to unlock all the instances (even the instances it believe it was not able to lock).
+<br/>
+<br/># Synchronous or not? 
+<br/>
+<br/>Basically the algorithm is partially synchronous: it relies on the assumption that while there is no synchronized clock across the processes, still the local time in every process flows approximately at the same rate, with an error which is small compared to the auto-release time of the lock. This assumption closely resembles a real-world computer: every computer has a local clock and we can usually rely on different computers to have a clock drift which is small.
+<br/>
+<br/>Moreover we need to refine our mutual exclusion rule: it is guaranteed only as long as the client holding the lock will terminate its work within the lock validity time (as obtained in step 3), minus some time (just a few milliseconds in order to compensate for clock drift between processes).
+<br/>
+<br/># Retry
+<br/>
+<br/>When a client is not able to acquire the lock, it should try again after a random delay in order to try to desynchronize multiple clients trying to acquire the lock, for the same resource, at the same time (this may result in a split brain condition where nobody wins). Also the faster a client will try to acquire the lock in the majority of Redis instances, the less window for a split brain condition (and the need for a retry), so ideally the client should try to send the SET commands to the N instances at the same time using multiplexing.
+<br/>
+<br/>It is worth to stress how important is for the clients that failed to acquire the majority of locks, to release the (partially) acquired locks ASAP, so that there is no need to wait for keys expiry in order for the lock to be acquired again (however if a network partition happens and the client is no longer able to communicate with the Redis instances, there is to pay an availability penalty and wait for the expires).
+<br/>
+<br/># Releasing the lock
+<br/>
+<br/>Releasing the lock is simple and involves just to release the lock in all the instances, regardless of the fact the client believe it was able to successfully lock a given instance.
+<br/>
+<br/># Safety arguments
+<br/>
+<br/>Is this system safe? We can try to understand what happens in different scenarios.
+<br/>
+<br/>To start let’s assume that a client is able to acquire the lock in the majority of instances. All the instances will contain a key with the same time to live. However the key was set at different times, so the keys will also expire at different times. However if the first key was set at worst at time T1 (the time we sample before contacting the first server) and the last key was set at worst at time T2 (the time we obtained the reply from the last server), we are sure that the first key to expire in the set will exist for at least MIN_VALIDITY=TTL-(T2-T1)-CLOCK_DRIFT. All the other keys will expire later, so we are sure that the keys will be simultaneously set for at least this time.
+<br/>
+<br/>During the time the majority of keys are set, another client will not be able to acquire the lock, since N/2+1 SET NX operations can’t succeed if N/2+1 keys already exist. So if a lock was acquired, it is not possible to re-acquire it at the same time (violating the mutual exclusion property).
+<br/>
+<br/>However we want to also make sure that multiple clients trying to acquire the lock at the same time can’t simultaneously succeed.
+<br/>
+<br/>If a client locked the majority of instances using a time near, or greater, than the lock maximum validity time (the TTL we use for SET basically), it will consider the lock invalid and will unlock the instances, so we only need to consider the case where a client was able to lock the majority of instances in a time which is less than the validity time. In this case for the argument already expressed above, for MIN_VALIDITY no client should be able to re-acquire the lock. So multiple clients will be albe to lock N/2+1 instances at the same time (with “time" being the end of Step 2) only when the time to lock the majority was greater than the TTL time, making the lock invalid.
+<br/>
+<br/>Are you able to provide a formal proof of safety, or to find a bug? That would be very appreciated.
+<br/>
+<br/># Liveness arguments
+<br/>
+<br/>The system liveness is based on three main features:
+<br/>
+<br/>1) The auto release of the lock (since keys expire): eventually keys are available again to be locked.
+<br/>
+<br/>2) The fact that clients, usually, will cooperate removing the locks when the lock was not acquired, or when the lock was acquired and the work terminated, making it likely that we don’t have to wait for keys to expire to re-acquire the lock.
+<br/>
+<br/>3) The fact that when a client needs to retry a lock, it waits a time which is comparable greater to the time needed to acquire the majority of locks, in order to probabilistically make split brain conditions during resource contention unlikely.
+<br/>
+<br/>However there is at least a scenario where a very special network partition/rejoin pattern, repeated indefinitely, may violate the system availability.
+<br/>For example with N=5, two clients A and B may try to lock the same resource at the same time, nobody will be able to acquire the majority of locks, but they may be able to lock the majority of nodes if we sum the locks of A and B (for example client A locked 2 instances, client B just one instance).
+<br/>Then the clients are partitioned away before they can unlock the locked instances. This will leave the resource not lockable for a time roughly equal to the auto release time. Then when the keys expire, the two clients A and B join again the partition repeating the same pattern, and so forth indefinitely.
+<br/>
+<br/>Another point of view to see the problem above, is that we pay an availability penalty equal to “TTL” time on network partitions, so if there are continuous partitions, we can pay this penalty indefinitely.
+<br/>
+<br/>I can’t find a simple way to have guaranteed liveness (but did not tried very hard honestly), but the worst case appears to be hard to trigger.
+<br/>Basically it means that we can only provide, using this algorithm, an approximation of Property number 2.
+<br/>
+<br/># Performance, crash-recovery and fsync
+<br/>
+<br/>Many users using Redis as a lock server need high performance in terms of both latency to acquire and release a lock, and number of acquire / release operations that it is possible to perform per second. In order to meet this requirement, the strategy to talk with the N Redis servers to reduce latency is definitely multiplexing (or poor’s man multiplexing, which is, putting the socket in non-blocking mode, send all the commands, and read all the commands later, assuming that the RTT between the client and each instance is similar).
+<br/>
+<br/>However there is another consideration to do about persistence if we want to target a crash-recovery system model.
+<br/>
+<br/>Basically to see the problem here, let’s assume we configure Redis without persistence at all. A client acquires the lock in 3 of 5 instances. One of the instances where the client was able to acquire the lock is restarted, at this point there are again 3 instances that we can lock for the same resource, and another client can lock it again, violating the safety property of exclusivity of lock.
+<br/>
+<br/>If we enable AOF persistence, things will improve quite a bit. For example we can upgrade a server by sending SHUTDOWN and restarting it. Because Redis expires are semantically implemented so that virtually the time still elapses when the server is off, all our requirements are fine.
+<br/>However everything is fine as long as it is a clean shutdown. What about a power outage? If Redis is configured, as by default, to fsync on disk every second, it is possible that after a restart our key is missing. Long story short if we want to guarantee the lock safety in the face of any kind of instance restart, we need to enable fsync=always in the persistence setting. This in turn will totally ruin performances to the same level of CP systems that are traditionally used to implement distributed locks in a safe way.
+<br/>
+<br/>The good news is that because in our algorithm we don’t stop to acquire locks as soon as we reach the majority of the servers, the actual probability of safety violation is small, because most of the times the lock will be hold in all the 5 servers, so even if one restarts without a key, it is practically unlikely (but not impossible) that an actual safety violation happens. Long story short, this is an user pick, and a big trade off. Given the small probability for a race condition, if it is acceptable that with an extremely small probability, after a crash-recovery event, the lock may be acquired at the same time by multiple clients, the fsync at every operation can (and should) be avoided.
+<br/>
+<br/># Reference implementation
+<br/>
+<br/>I wrote a simple reference implementation in Ruby, backed by redis-rb, here: http://github.com/antirez/redlock-rb
+<br/>
+<br/># Want to help?
+<br/>
+<br/>If you are into distributed systems, it would be great to have your opinion / analysis.
+<br/>Also reference implementations in other languages could be great.
+<br/>
+<br/>Thanks in advance!
+<br/>
+<br/>EDIT: I received feedbacks in this blog post comment and via Hacker News that's worth to incorporate in this blog post.
+<br/>
+<br/>1) As Steven Benjamin notes in the comments below, if after restarting an instance we can make it unavailable for enough time for all the locks that used this instance to expire, we don't need fsync. Actually we don't need any persistence at all, so our safety guarantee can be provided with a pure in-memory configuration.
+<br/>
+<br/>An example: previously we described the example race condition where a lock is obtained in 3 servers out of 5, and one of the servers where the lock was obtained restarts empty: another client may acquire the same lock by locking this server and the other two that were not locked by the previous client. However if the restarted server is not available for queries enough time for all the locks that were obtained with it to expire, we are guaranteed this race is no longer possible.
+<br/>
+<br/>2) The Hacker News user eurleif noticed how it is possible to reacquire the lock as a strategy if the client notices it is taking too much time in order to complete the operation. This can be done by just extending an existing lock, sending a script that extends the expire of the value stored at the key is the expected one. If there are no new partitions, and we try to extend the lock enough in advance so that the keys will not expire, there is the guarantee that the lock will be extended.
+<br/>
+<br/>3) The Hacker News user mjb noted how the term "skew" is not correct to describe the difference of the rate at which different clocks increment their local time, and I'm actually talking about "Drift". I'm replacing the word "skew" with "drift" to use the correct term.
+<br/>
+<br/>Thanks for the very useful feedbacks.
+<a href="http://antirez.com/news/77">Comments</a></div>
+    </summary>
+    <updated>2015-06-09T15:19:31Z</updated>
+    <source>
+      <id>http://antirez.com</id>
+      <author>
+        <name>Antirez</name>
+      </author>
+      <link href="http://antirez.com" rel="alternate" type="text/html"/>
+      <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
+      <subtitle>Description pending</subtitle>
+      <title>Antirez weblog</title>
+      <updated>2015-06-09T19:16:44Z</updated>
+    </source>
+  </entry>
+
+  <entry>
+    <id>http://antirez.com/news/76</id>
+    <link href="http://antirez.com/news/76" rel="alternate" type="text/html"/>
+    <title>Using Heartbleed as a starting point</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">The strong reactions about the recent OpenSSL bug are understandable: it is not fun when suddenly all the internet needs to be patched. Moreover for me personally how trivial the bug is, is disturbing. I don’t want to point the finger to the OpenSSL developers, but you just usually think at those class of issues as a bit more subtle, in the case of a software like OpenSSL. Usually you fail to do sanity checks *correctly*, as opposed to this bug where there is a total *lack* of bound checks in the memcpy() call.
+<br/>
+<br/>However sometimes in the morning I read the code I wrote the night before and I’m deeply embarrassed. Programmers sometimes fail, I for sure do often, so my guess is that what is needed is a different process, and not a different OpenSSL team.
+<br/>
+<br/>There is who proposes a different language safer than C, and who proposes that the specification is broken because it is too complex. Probably there is some truth in both arguments, however it is unlikely that we move to a different specification or system language soon, so the real question is, what we can do now to improve system software security?
+<br/>
+<br/>1) Throw money at it.
+<br/>
+<br/>Making system code safer is simple if there are investments. If different companies hire security experts to do code auditings in the OpenSSL code base, what happens is that the probability of discovering a bug like heartbleed is greater.
+<br/>
+<br/>I’ve seen very complex bugs that are triggered by a set of non-trivial conditions being discovered by serious code auditing efforts. A memcpy() without bound checks is something that if you analyze the code security-wise, will stand out in the first read. And guess how heartbleed was discovered? Via security auditings performed at Google.
+<br/>
+<br/>Probably the time to consider open source something that mostly we take from is over. Many companies should follow the example of Google and other companies, using workforce for OSS software development and security.
+<br/>
+<br/>2) Static and dynamic checks.
+<br/>
+<br/>Static code analysis is, as a side effect, a semi-automated way to do code auditings.
+<br/>In critical system code like OpenSSL even to do some source code annotation or use a set of rules to make static analysis more effective is definitely acceptable.
+<br/>
+<br/>Static tools today are not a total solution, but the output of a static analysis if carefully inspected by an expert programmer can provide some value.
+<br/>
+<br/>Another great help comes from dynamic checks like Valgrind. Every system software written in C should be tested using Valgrind automatically at every new commit.
+<br/>
+<br/>3) Abstract C with libraries.
+<br/>
+<br/>C is low level and has no built in safety in the language. However something good about C is that it is a language that allows to build layers on top of its rawness.
+<br/>
+<br/>A sane dynamic string library prevents a lot of buffer overflow issues, and today almost every decent project is using one. However there is more you can do about it. For example for security critical code where memory can contain things like private keys, you can augment your dynamic string library with memory copy primitives that only copy from one buffer to the other performing implicit sanity checks.
+<br/>
+<br/>Moreover if a buffer contains critical data, you can set logical permissions so that trying to copy from this area aborts the program. There are other less-portable ways using memory management to protect important memory pages in an even more effective ways, however an higher C-level protection can be much simpler in the real-world because of portability / predictability concerns.
+<br/>
+<br/>In general many things can be explored to avoid using C without protections, creating a library that abstracts on top of it to make programming safer.
+<br/>
+<br/>4) Randomized tests.
+<br/>
+<br/>Unit tests are unlikely to trigger edge cases and failed sanity checks.
+<br/>There is a class of tests that is known since decades that is, in my opinion, not used enough: fuzzy testing.
+<br/>
+<br/>The OpenSSL bug was definitely discoverable by sending different kind of OpenSSL packets with different randomized parameters, in conjunction with dynamic analysis tools like Valgrind.
+<br/>
+<br/>In my experience having a great deal of randomized tests together with an environment where the same tests are ran again and again with the program running over Valgrind, can discover a number of real-world bugs that gets otherwise unnoticed. There are many models to explore, usually you want something that injects totally random data, and intermediate models where valid packets are corrupted in different random ways.
+<br/>
+<br/>A typical example of this technique is the old DNS compression infinite-loop bug. Trow a few random packets to a naive implementation and you’ll find it in a matter of minutes.
+<br/>
+<br/>5) Change of mentality about security vs performance.
+<br/>
+<br/>It is interesting that OpenSSL is doing its own allocation caching stuff because in some systems malloc/free is slow. This is a sign that still performances, even in security critical code, is regarded with too much respect over safety. In this specific instance, it must be admitted that probably when the OpenSSL developers wrapped malloc, they never though of security implications by doing so. However the fact that they cared about a low-level detail like the allocation functions in *some* system is a sign of deep concerns about performances, while they should be more deeply concerned about the correctness / safety of the system.
+<br/>
+<br/>In general it does not help the fact that the system that is the de facto standard in today’s servers infrastructure, that is, Linux, has had, and still has, one of the worst allocators you will find around, mostly for licensing concerns, since the better allocators are not GPL but BSD licensed.
+<br/>
+<br/>Probably yet another area where big corps should contribute, by providing significant improvements to glibc malloc. Glibc malloc is, even if better alternatives are available, what many real-world system softwares are going to use anyway.
+<br/>
+<br/>I would love to see the discussion about heartbleed to take a more pragmatic approach, because one thing is guaranteed: to blame here or there will not change the actual level of the security of OpenSSL or anything else, and there are new challenges in the future. For example the implementation of HTTP/2.0 may be a very delicate moment security wise.
+<br/>
+<br/>EDIT: Actually I was not right and the malloc implementation inside the Glibc is BSD licensed, so it is not a license issue. I don't know why the Glibc is not using Jemalloc instead that is very good and actively developed allocator.
+<a href="http://antirez.com/news/76">Comments</a></div>
+    </summary>
+    <updated>2015-06-09T15:19:31Z</updated>
+    <source>
+      <id>http://antirez.com</id>
+      <author>
+        <name>Antirez</name>
+      </author>
+      <link href="http://antirez.com" rel="alternate" type="text/html"/>
+      <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
+      <subtitle>Description pending</subtitle>
+      <title>Antirez weblog</title>
+      <updated>2015-06-09T19:16:44Z</updated>
+    </source>
+  </entry>
+
+  <entry>
+    <id>http://antirez.com/news/75</id>
+    <link href="http://antirez.com/news/75" rel="alternate" type="text/html"/>
+    <title>Redis new data structure: the HyperLogLog</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">Generally speaking, I love randomized algorithms, but there is one I love particularly since even after you understand how it works, it still remains magical from a programmer point of view. It accomplishes something that is almost illogical given how little it asks for in terms of time or space. This algorithm is called HyperLogLog, and today it is introduced as a new data structure for Redis.
+<br/>
+<br/>Counting unique things
+<br/>===
+<br/>
+<br/>Usually counting unique things, for example the number of unique IPs that connected today to your web site, or the number of unique searches that your users performed, requires to remember all the unique elements encountered so far, in order to match the next element with the set of already seen elements, and increment a counter only if the new element was never seen before.
+<br/>
+<br/>This requires an amount of memory proportional to the cardinality (number of items) in the set we are counting, which is, often absolutely prohibitive.
+<br/>
+<br/>There is a class of algorithms that use randomization in order to provide an approximation of the number of unique elements in a set using just a constant, and small, amount of memory. The best of such algorithms currently known is called HyperLogLog, and is due to Philippe Flajolet.
+<br/>
+<br/>HyperLogLog is remarkable as it provides a very good approximation of the cardinality of a set even using a very small amount of memory. In the Redis implementation it only uses 12kbytes per key to count with a standard error of 0.81%, and there is no limit to the number of items you can count, unless you approach 2^64 items (which seems quite unlikely).
+<br/>
+<br/>The algorithm is documented in the original paper [1], and its practical implementation and variants were covered in depth by a 2013 paper from Google [2].
+<br/>
+<br/>[1] http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf
+<br/>[2] http://static.googleusercontent.com/media/research.google.com/en//pubs/archive/40671.pdf
+<br/>
+<br/>How it works?
+<br/>===
+<br/>
+<br/>There are plenty of wonderful resources to learn more about HyperLogLog, such as [3].
+<br/>
+<br/>[3] http://blog.aggregateknowledge.com/2012/10/25/sketch-of-the-day-hyperloglog-cornerstone-of-a-big-data-infrastructure/
+<br/>
+<br/>Here I’ll cover only the basic idea using a very clever example found at [3]. Imagine you tell me you spent your day flipping a coin, counting how many times you encountered a non interrupted run of heads. If you tell me that the maximum run was of 3 heads, I can imagine that you did not really flipped the coin a lot of times. If instead your longest run was 13, you probably spent a lot of time flipping the coin.
+<br/>
+<br/>However if you get lucky and the first time you get 10 heads, an event that is unlikely but possible, and then stop flipping your coin, I’ll provide you a very wrong approximation of the time you spent flipping the coin. So I may ask you to repeat the experiment, but this time using 10 coins, and 10 different piece of papers, one per coin, where you record the longest run of heads. This time since I can observe more data, my estimation will be better.
+<br/>
+<br/>Long story short this is what HyperLogLog does: it hashes every new element you observe. Part of the hash is used to index a register (the coin+paper pair, in our previous example. Basically we are splitting the original set into m subsets). The other part of the hash is used to count the longest run of leading zeroes in the hash (our run of heads). The probability of a run of N+1 zeroes is half the probability of a run of length N, so observing the value of the different registers, that are set to the maximum run of zeroes observed so far for a given subset, HyperLogLog is able to provide a very good approximated cardinality.
+<br/>
+<br/>The Redis implementation
+<br/>=== 
+<br/>
+<br/>The standard error of HyperLogLog is 1.04/sqrt(m), where “m” is the number of registers used.
+<br/>Redis uses 16384 registers, so the standard error is 0.81%.
+<br/>
+<br/>Since the hash function used in the Redis implementation has a 64 bit output, and we use 14 bits of the hash output in order to address our 16k registers, we are left with 50 bits, so the longest run of zeroes we can encounter will fit a 6 bit register. This is why a Redis HyperLogLog value only uses 12k bytes for 16k registers.
+<br/>
+<br/>Because of the use of a 64 bit output function, which is one of the modifications of the algorithm that Google presented in [2], there are no practical limits to the cardinality of the sets we can count. Moreover it is worth to note that the error for very small cardinalities tend to be very small. The following graph shows a run of the algorithm against two different large sets. The cardinality of the set is shown in the x axis, while the relative error (in percentage) in the y axis.
+<br/>
+<br/>img://antirez.com/misc/hll_1.png
+<br/>
+<br/>The red and green lines are two different runs with two totally unrelated sets. It shows how the error is consistent as the cardinality increases. However for much smaller cardinalities, you can enjoy a much smaller error:
+<br/>
+<br/>img://antirez.com/misc/hll_2.png
+<br/>
+<br/>The green line shows the error of a single run up to cardinality 100, while the red line is the maximum error found in 100 runs. Up to a cardinality of a few hundreds the algorithm is very likely to make a very small error or to provide the exact answer. This is very valuable when the computed value is shown to an user that can visually match if the answer is correct.
+<br/>
+<br/>The source code of the Redis implementation is available at Github:
+<br/>
+<br/>https://github.com/antirez/redis/blob/unstable/src/hyperloglog.c
+<br/>
+<br/>The API
+<br/>===
+<br/>
+<br/>From the point of view of Redis an HyperLogLog is just a string, that happens to be exactly 12k + 8 bytes in length
+<br/>(12296 bytes to be precise). All the HyperLogLog commands will happily run if called with a String value exactly of this size, or will report an error. However all the calls are safe whatever is stored in the string: you can store garbage and still ask for an estimation of the cardinality. In no case this will make the server crash.
+<br/>
+<br/>Also everything in the representation is endian neutral and is not affected by the processor word size, so a 32 bit big endian processor can read the HLL of a 64 bit little endian processor.
+<br/>
+<br/>The fact that HyperLogLogs are strings avoided the introduction of an actual type at RDB level. This allows the work to be back ported into Redis 2.8 in the next days, so you’ll be able to use HyperLogLogs ASAP. Moreover the format is automatically serialized, and can be retrieved and restored easily.
+<br/>
+<br/>The API is constituted of three new commands:
+<br/>
+<br/>PFADD var element element … element
+<br/>PFCOUNT var
+<br/>PFMERGE dst src src src … src
+<br/>
+<br/>The commands prefix is “PF” in honor of Philippe Flajolet [4].
+<br/>
+<br/>[4] http://en.wikipedia.org/wiki/Philippe_Flajolet
+<br/>
+<br/>PFADD adds elements to the HLL stored at “var”. If the variable does not exist, an empty HLL is automatically created as it happens always with Redis API calls. The command is variadic, so allows for very aggressive pipelining and mass insertion.
+<br/>
+<br/>The command returns 1 if the underlying HyperLogLog was modified, otherwise 0 is returned.
+<br/>This is interesting for the user since as we add elements the probability of an element actually modifying some register decreases. The fact that the API is able to provide hints about the fact that a new cardinality is available allows for programs that continuously add elements and retrieve the approximated cardinality only when a new one is available.
+<br/>
+<br/>PFCOUNT returns the estimated cardinality, which is zero if the key does not exist.
+<br/>
+<br/>Finallly PFMERGE can merge N different HLL values into one. The resulting HLL will report an estimated cardinality that is the cardinality of the union of the different sets that we counted with the different HLL values.
+<br/>This seems magical but works because HLL while randomized is fully deterministic, so PFMERGE just takes, for every register, the maximum value available across the N HLL values. A given element hashes to the same register with the same run of zeroes always, so the merge performed in this way will only add the count of the elements that are not common to the different HLLs.
+<br/>
+<br/>As you can see HyperLogLog is fully parallelizable, since it is possible to split a set into N subsets counted independently to later merge the values and obtain the total cardinality approximation. The fact that HLLs in Redis are just strings helps to move HLL values across instances.
+<br/>
+<br/>First make it correct, then make it fast
+<br/>===
+<br/>
+<br/>Redis HHLs are composed of 16k registers packed into 6 bit integers. This creates several performance issues that must be solved in order to provide an API of commands that can be called without thinking too much.
+<br/>
+<br/>One problem is that accessing to registers require accessing multiple bytes, shifting, and masking in order to retrieve the correct 6 bit value. This is not a big problem for PFADD that only touches a register for every element, but PFCOUNT needs to perform a computation using all the 16k registers, so if there are non trivial constant times to access every single register, the command risks to be slow. Moreover, while accessing the registers, we need to compute the sum of pow(2,-register) which involves floating point math.
+<br/>
+<br/>One may feel the temptation of using full bytes instead of 6 bit integers in order to speedup the computation, however this would be a shame since every HLL would use 16k instead of 12k that is a non trivial difference, so this route was discarded at the beginning. The command was optimized for a speedup of about 3 times compared to the initial implementation by doing the following changes:
+<br/>
+<br/>* For m=16k which is the Redis default (the implementation is more generic and could theoretically work with different values) the implementation selects a fast-path with unrolled loops accessing 16 register at every time. The registers are accessed using fixed offsets / shifts / masks (via some pointer that is incremented 12 bytes at the next iteration).
+<br/>* The floating point computation was modified in order to allow for multiple operations to be performed in parallel when possible. This was just a matter of adding parens. Floating point math is not commutative, but in this case there was no loss of precision.
+<br/>* The pow(2,-register) term was precomputed in a lookup table.
+<br/>
+<br/>With the 3x speedup provided by the above changes the command was able to perform about 60k calls per second in a fast hardware. However this is still far from the hundreds thousands calls possible with commands that are, from the user point of view, conceptually similar, like SCARD.
+<br/>
+<br/>Instead of optimizing the computation of the approximated cardinality further, there was a simpler solution. Basically the output of the algorithm only changes if some register changes. However as already observed above, most of the PFADD calls don’t result in any register changed. This basically means that it is possible to cache the last output and recompute it only if some register changes.
+<br/>
+<br/>So our data structure has an additional tail of 8 bytes representing a 64bit unsigned integer in little endian format. If the most significant bit is set, then the precomputed value is stale and requires to be recomputed, otherwise PFCOUNT can use it as it is. PFADD just turns on the “invalid cache” bit when some register is modified.
+<br/>
+<br/>After this change even trying to add elements at maximum speed using a pipeline of 32 elements with 50 simultaneous clients, PFCOUNT was able to perform as well as any other O(1) command with very small constant times.
+<br/>
+<br/>Bias correction using polynomial regression
+<br/>===
+<br/>
+<br/>The HLL algorithm, in order to be practical, must work equally well in any cardinality range. Unfortunately the raw estimation performed by the algorithm is not very good for cardinalities less than m*2.5 (around 40000 elements for m=16384) since in this range the algorithm outputs biased or even results with larger errors depending on the exact range.
+<br/>
+<br/>The original HLL paper [1] suggests switching to Linear Counting [5] when the raw cardinality estimated by the first part of the HLL algorithm is less than m*2.5.
+<br/>
+<br/>[5] http://dblab.kaist.ac.kr/Publication/pdf/ACM90_TODS_v15n2.pdf
+<br/>
+<br/>Linear counting is a different cardinality estimator that uses a simple concept. We have a bitmap of N bits. Every time a new element must be counted, it is hashed, and the hash is used in order to index a random bit inside the bitmap, that is turned to 1. The number of unset bits in the bitmap gives an idea of how many elements we added so far using the following formula:
+<br/>
+<br/>    cardinality = m*log(m/ez);
+<br/>
+<br/>Where ‘ez’ is the number of zero bits and m is the total number of bits in the bitmap.
+<br/>
+<br/>Linear counting does not work well for large cardinalities compared to HyperLogLog, but works very well for small cardinalities. Since the HLL registers as a side effect also work as a linear counting bitmap, counting the number of zero registers it is possible to apply linear counting for the range where HLL does not perform well. Note that this is possible because when we update the registers, we don’t really use the longest run of zeroes, but the longest run of zeroes plus one. This means that if an element is added and it is addressing a register that was never addressed, the register will turn from 0 to a different value (at least 1).
+<br/>
+<br/>The problem with linear counting is that as the cardinality gets bigger, its output error gets larger, so we need to switch to HLL ASAP. However when we switch at 2.5m, HLL is still biased. In the following image the same cardinality was tested with 1000 different sets, and the error of each run is reported as a point:
+<br/>
+<br/>img://antirez.com/misc/hll_3.png
+<br/>
+<br/>The blu line is the average of the error. As you can see before a cardinality of 40k, where linear counting is used, the more we go towards greater cardinalities, the more the points “beam” gets larger (bigger errors). When we switch to HLL raw estimate the error is smaller, but there is a bias: the algorithm overestimates the cardinality in the range 40k-80k.
+<br/>
+<br/>Google engineers studied this problem extensively [2] in order to correct the bias. Their solution was to create an empirical table of cardinality values and the corresponding biases. Their modified algorithm uses the table and interpolation in order to get the bias in a given range, and correct accordingly.
+<br/>
+<br/>I used a different approach: you can see that the bias is not random but looks like a very smooth curve, so I calculated a few cardinality-bias samples and performed polynomial regression in order to find a polynomial approximating the curve.
+<br/>
+<br/>Currently I’m using a four order polynomial to correct in the range 40960-72000, and the following is the result after the bias correction:
+<br/>
+<br/>img://antirez.com/misc/hll_4.png
+<br/>
+<br/>While there is still some bias at the switching point between the two algorithms, the result is quite satisfying compared to the vanilla HLL algorithm, however it is probably possible to use a curve that fits better the bias curve. I had no time to investigate this further.
+<br/>
+<br/>It is worth to note that during my investigations I found that, when no bias correction is used, and at least for m=16384, the best value to switch from linear counting to raw HLL estimate is actually near 3 and not 2.5 as mentioned in [1], since a value of 3 both improves bias and error. Values larger than 3 will improve the bias (a value of 4 completely corrects it) but will have bad effects on the error.
+<br/>
+<br/>The original HLL algorithm also corrects for values towards 2^32 [1][2] since once we approach very large values collisions in the hash function starts to be an issue. We don’t need such correction since we use a 64 bit hash function and 6 bits counters, which is one of the modifications proposed by Google engineers [2] and adopted by the Redis implementation.
+<br/>
+<br/>Future work
+<br/>===
+<br/>
+<br/>Intuitively it seems like it is possible to improve the error of the algorithm output when linear counting is used by exploiting the additional informations we have. In the standard linear counting algorithm the registers are just 1 bit wide, so we have only two informations: if an element so far hashed to this bit or not. Still the HLL algorithm as proposed initially [1] and as modified at Google [2], when reverting to linear counting still only use the number of zero registers as the input of the algorithm. It is possible that also using the information stored in the registers could improve the output.
+<br/>
+<br/>For example in standard linear counting, assuming we have 10 bits, I may add 5 elements that all happen to address the same bit. This is an odd case that the algorithm has no way to correct, and the estimation provided will likely be smaller than the actual cardinality. However in the linear counting algorithm used by HLL in a similar situation we may found that the value at the only register set is an hint about multiple elements colliding there, allowing a correction of the output.
+<br/>
+<br/>Conclusion
+<br/>===
+<br/>
+<br/>HyperLogLog is an amazing data structure. My hope is that the Redis implementation, that will be available in a stable release in a matter of days (Redis 2.8.9 will include it), will provide this tool in a ready to use form to many programmers.
+<br/>
+<br/>The HN post is here: https://news.ycombinator.com/item?id=7506774
+<a href="http://antirez.com/news/75">Comments</a></div>
+    </summary>
+    <updated>2015-06-09T15:19:31Z</updated>
+    <source>
+      <id>http://antirez.com</id>
+      <author>
+        <name>Antirez</name>
+      </author>
+      <link href="http://antirez.com" rel="alternate" type="text/html"/>
+      <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
+      <subtitle>Description pending</subtitle>
+      <title>Antirez weblog</title>
+      <updated>2015-06-09T19:16:44Z</updated>
+    </source>
+  </entry>
+
+  <entry>
+    <id>http://antirez.com/news/74</id>
+    <link href="http://antirez.com/news/74" rel="alternate" type="text/html"/>
+    <title>Fascinating little programs</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">Yesterday and today I managed to spend some time with linenoise (http://github.com/antirez/linenoise), a minimal line-editing library designed to be a simple and small replacement for readline.
+<br/>I was trying to merge a few pull requests, to fix issues, and doing some refactoring at the same time. It was some kind of nirvana I was feeling: a complete control of small, self-contained, and useful code.
+<br/>
+<br/>There is something special in simple code. Here I’m not referring to simplicity to fight complexity or over engineering, but to simplicity per se, auto referential, without goals if not beauty, understandability and elegance.
+<br/>
+<br/>After all the programming world has always been fascinated with small programs. For decades programmers challenged in 1k or 4k contexts, from the 6502 assembler to today’s javascript contests.
+<br/>Even the obfuscated C contest, after all, has a big component in the minimalism.
+<br/>
+<br/>Why is it so great to hack a small piece of code? Yes is small and simple, those are two good points. It can be totally understood, dominated. You can use smartness since little code is the only place of the world where coding smartness will pay off, since in large projects obviousness is far better in the long run. However I believe there is more than that, and is that small programs can be perfect. As perfect as a sonnet composed of a few words. The limits in size and in scope, constitute an intellectual stratagem to avoid the “it may be better" trap, when this better is not actually measurable and evident. Under these strict limits, what the program does is far more interesting than what it does not. Actually the constraints are the more fertile ground for creativity of the solutions, otherwise likely useless: at scale there is always a more correct, understood, canonical way to do everything.
+<br/>
+<br/>There is an interview of Bill Gates in the first years of the Microsoft experience where he describes this feeling when writing the famous Microsoft BASIC interpreter. The limits were the same we self impose today to ourselves for fun, in the contests, or just for the sake of it. There was a generation of programmers that was able to experience perfection in their creations, where it was obvious to measure and understand if a change actually lead to an improvement of the program or not, in a territory where space and time were so scarse. There was no room for wastes and not needed complexity.
+<br/>
+<br/>Today’s software is in some way the triumph of the other reality of software: layers of complexities that gave use incredible devices or infrastructure technologies that in the hands of non experts leverage a number of possibilities. However maybe there is still something to preserve from the ancient times where software could be perfect, the feeling that what you are creating has a structure and is not just a pile of code that works. If you zoom out enough, you’ll see your large program is actually quite small again, and at least at this scale, it should resemble perfection, or at least, aim at it.
+<a href="http://antirez.com/news/74">Comments</a></div>
+    </summary>
+    <updated>2015-06-09T15:19:31Z</updated>
+    <source>
+      <id>http://antirez.com</id>
+      <author>
+        <name>Antirez</name>
+      </author>
+      <link href="http://antirez.com" rel="alternate" type="text/html"/>
+      <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
+      <subtitle>Description pending</subtitle>
+      <title>Antirez weblog</title>
+      <updated>2015-06-09T19:16:44Z</updated>
+    </source>
+  </entry>
+
+  <entry>
+    <id>http://antirez.com/news/73</id>
+    <link href="http://antirez.com/news/73" rel="alternate" type="text/html"/>
+    <title>What is performance?</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">The title of this blog post is an apparently trivial to answer question, however it is worth to consider a bit better what performance really means: it is easy to get confused between scalability and performance, and to decompose performance, in the specific case of database systems, in its different main components, may not be trivial. In this short blog post I’ll try to write down my current idea of what performance is in the context of database systems.
+<br/>
+<br/>A good starting point is probably the first slide I use lately in my talks about Redis. This first slide is indeed about performance, and says that performance is mainly three different things.
+<br/>
+<br/>1) Latency: the amount of time I need to get the reply for a query.
+<br/>
+<br/>2) Operations per unit of time per core: how many queries (operations) the system is able to reply per second, in a given reference computational unit?
+<br/>
+<br/>3) Quality of operations: how much work those operations are able to accomplish?
+<br/>
+<br/>Latency
+<br/>—
+<br/>
+<br/>This is probably the simplest component of performance. In many applications it is desirable that the time needed to get a reply from the system is small. However while the average time is important, another concern is the predictability of the latency figure, and how much difference there is between the average case and the worst case. When used well, in-memory systems are able to provide very good latency characteristics, and are also able to provide a consistent latency over time.
+<br/>
+<br/>Operations per second per core
+<br/>—
+<br/>
+<br/>The second component I’m enumerating is what makes the difference between raw performance and scalability. We are interested in the amount of work the system is able to do, in a given unit of time, for a given reference computational unit. Linearly scalable systems can reach a big number of operations per second by using a number of nodes, however this means they are scalable, and not necessarily performant.
+<br/>
+<br/>Operations per second per core is also usually bound to the amount of queries you can perform per watt, so to the energy efficiency of the system. 
+<br/>
+<br/>Quality of operations
+<br/>—
+<br/>
+<br/>The last point, while probably not as stressed among developers as throughput and latency, is really important in certain kind of systems, especially in-memory systems.
+<br/>
+<br/>A system that is able to perform 100 operations per second, but with operations of “poor quality” (for example just GET and SET in Redis terms) has a lower performance compared to a system that is also able to perform an INCR operation with the same latency and OPS characteristics.
+<br/>For instance, if the problem at hand is to increment counters, the former system will require two operations to increment a counter (we are not considering race conditions in this context), while the system providing INCR is able to use a single operation. As a result it is actually able to provide twice the performance of the former system.
+<br/>
+<br/>As you can see the quality of operations is not an absolute meter, but depends on the kind of problem to solve. The same two systems if we want to cache HTML fragments are equivalent since the INCR operation would be useless.
+<br/>
+<br/>The quality of operations is particularly important in in-memory systems, since usually the computation itself is negligible compared to the time needed to receive, dispatch the command, and create a reply, so systems like Redis with a rich set of operations are able to provide better performance in many contexts almost for free, just allowing the user to do more with a single operation. The “do more” part can actually mean a lot of things: either provide a reply to a more complex question, like for example the ZRANK command of Redis, or simply being able to provide a more *selective* reply, like HMGET command that is able to provide information just for a subset of the fields composing an Hash value, reducing the amount of bandwidth required between the server and its clients.
+<br/>
+<br/>In general quality of operations don't only affect performances because they give less or more value to the operations per second the system is able to perform: operations quality also directly affect latency, since more complex operations are able to avoid back and forth data transfer between clients and servers required to mount multiple simpler operations into a more complex computation.
+<br/>
+<br/>Conclusion
+<br/>—
+<br/>
+<br/>I hope that this short exploration of what performance is uncovered some of the complexities involved in the process of evaluating the capabilities of a database system from this specific point of view. There is a lot more to say about it, but I found that the above three components of the performance are among the most interesting and important when evaluating a system and when there is to understand how to evolve an existing system to improve its performance characteristics.
+<br/>
+<br/>Thanks to Yiftach Shoolman for feedbacks about this topic.
+<a href="http://antirez.com/news/73">Comments</a></div>
+    </summary>
+    <updated>2015-06-09T15:19:31Z</updated>
+    <source>
+      <id>http://antirez.com</id>
+      <author>
+        <name>Antirez</name>
+      </author>
+      <link href="http://antirez.com" rel="alternate" type="text/html"/>
+      <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
+      <subtitle>Description pending</subtitle>
+      <title>Antirez weblog</title>
+      <updated>2015-06-09T19:16:44Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en">
+    <id>http://redislabs.com/?p=10142</id>
+    <link href="https://redislabs.com/blog/cve-2015-4335-dsa-3279-redis-lua-sandbox-escape" rel="alternate" type="text/html"/>
+    <title>CVE-2015-4335/DSA-3279 – Redis Lua Sandbox Escape</title>
+    <summary>All you need to know about the recent Redis Lua sandbox exploit and the importance of using password authentication</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p><img alt="" class="aligncenter size-full wp-image-10143" height="200" src="https://redislabs.com/wp-content/uploads/2015/06/20150608_pmr_art.png" title="Pimp My Redis - The Lua Sandbox Escape" width="635"/></p>
+
+<p><b>What happened?</b> Last week, in a post titled <a href="http://benmmurphy.github.io/blog/2015/06/04/redis-eval-lua-sandbox-escape/" target="_blank">"Redis EVAL Lua Sandbox Escape"</a>, security researcher Ben Murphy unveiled the details of a known Lua exploit that can be used for breaking out of Redis' sandbox. Mr. Murphy was also kind enough to provide a patch that addresses said issue, which in turn was immediately included in <a href="https://groups.google.com/forum/#!msg/redis-db/4Y6OqK8gEyk/Dg-5cejl-eUJ" target="_blank">new releases for Redis v2.8.21 and v3.0.2</a> from antirez, a.k.a. Salvatore Sanfilippo (as reported in last week's <a href="https://redislabs.com/redis-watch-archive/46#lua-sandbox-escape" target="_blank">Redis Watch</a> newsletter).</p>
+
+<p><b>How serious is this?</b> Any security vulnerability is serious business, but while a malicious person can indeed exploit vulnerability to wreck havoc, it does require a non-trivial amount of skill do so. For example, refer to this sample code that's designed to attack Lua 5.1 on a Windows 32-bit platform: <a href="https://gist.github.com/corsix/6575486" target="_blank">https://gist.github.com/corsix/6575486</a>. Furthermore, the exploit itself is but one step in a process that would involve attacking additional components of the compromised system. The bottom line is that while you should definitely take steps to protect your Redis servers against this exploit, keep in mind that the risk isn't considered high.</p>
+
+<p><b>How can you protect yourself?</b> There are several steps you can take to protect your Redis from would-be-hackers' pwnage. Here they are in order of importance:</p>
+
+<ol>
+	<li><b>Use password authentication</b> – If you're not using it, anyone can connect to it and <a href="https://twitter.com/itamarhaber/status/591017658604216321" target="_blank">pimp your Redis</a>.</li>
+	<li><b>Use password authentication</b> – Seriously, use a password.</li>
+	<li><b>Moar security</b> – If you're using Redis Cloud or Redis Labs Enterprise Cluster (RLEC), consider using the access control lists provided from your dashboard to restrict access by security group and/or IP addresses or subnets. If you're running your own Redis servers, a firewall with some hard-and-sane policies can get you the same effect.</li>
+	<li><b>SSL authentication and encryption</b> – Protect yourself further by switching to a Redis Cloud or RLEC <a href="https://redislabs.com/kb/read-more-ssl" target="_blank">SSL-enabled database</a>. Do-it-yourselfers can <a href="https://redislabs.com/blog/using-stunnel-to-secure-redis" target="_blank">use stunnel</a> to secure their servers in the same manner.</li>
+</ol>
+
+<p><b>Upgrade your Redis</b>. The new versions of open source Redis include the fix so you should be all good once you upgrade (if you're running your own). RLEC users only need to install the newest software update in order apply the patch to their databases. We've also backported the patch to our cloud service, so new databases are immune to the vulnerability and we're applying it online to existing instances. If you have any concerns or questions please contact our help desk at: <a href="mailto:support@redislabs.com" target="_blank">support@redislabs.com</a></p>
+
+<p><b>Quick n' dirty n' awesome tip:</b> here's a little nugget from <a href="https://news.ycombinator.com/item?id=9658937" target="_blank">geocar</a> – rename QUIT to POST to deal with that SSRF threat &lt;- lovely!</p>
+
+<p><b>Redis Trivia:</b> AFAIK, this is the first Redis vulnerability that was registered in the MITRE Common Vulnerabilities and Exposures Directory (<a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-4335" target="_blank">CVE-2015-4335</a> which is no longer up for some reason, did it escape too?) and at the Debian Security Advisory (<a href="https://www.debian.org/security/2015/dsa-3279" target="_blank">DSA-3279</a>) so double yay! Also note how, by sheer conspicuous coincidence, the DSA's ID for the vulnerability is given by the following formulae:</p>
+
+<p><img src="https://redislabs.com/wp-content/uploads/2015/06/lua_sandbox_dsa.png"/></p>
+
+<p>I'm still working on cracking the logic behind the CVE ID thoughâ€¦ Any Suggestions? Questions? Feedback? <a href="mailto:itamar@redislabs.com" target="_blank">Email</a> or <a href="https://twitter.com/itamarhaber" target="_blank">tweet</a> at me – I'm highly available :)</p></div>
+    </content>
+    <updated>2015-06-09T10:52:45Z</updated>
+    <category term="Uncategorized"/>
+    <author>
+      <name>Itamar Haber</name>
+    </author>
+    <source>
+      <id>https://redislabs.com</id>
+      <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
+      <link href="https://redislabs.com" rel="alternate" type="text/html"/>
+      <title>Redis Labs</title>
+      <updated>2015-06-09T19:16:52Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en-us">
+    <id>https://vividcortex.com/blog/2015/06/08/improving-user-parsing-mysql-protocol/</id>
+    <link href="https://vividcortex.com/blog/2015/06/08/improving-user-parsing-mysql-protocol/" rel="alternate" type="text/html"/>
+    <title>Improved User Parsing From The MySQL Protocol</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>This isn’t really a feature we should brag about, because it’s a bug that took
+us a while to figure out, but we believe in sharing the bad as well as the good.
+There’s a lot to learn from TCP reassembly and protocol reverse engineering!</p>
+
+<p>We received a request from a customer to help track down the user that was
+sending some queries to their database. Normally we can find this information
+easily: the user is one of the properties of query samples, and we can just
+click on a sample and see it. But for this particular customer, the user was
+always <code>unknown_user</code>.</p>
+
+<p>This means we weren’t able to figure out what database user was issuing the
+query. Normally there are two ways we can figure out what the user is:</p>
+
+<ol>
+<li>We see the connection handshake and capture the username from there.</li>
+<li>We see a <code>COM_CHANGE_USER</code> packet and capture it from that (rare).</li>
+</ol>
+
+<p>Our theory was that this customer’s database connections were all very
+long-lived, and we never got to see the connection setup sequence. But this
+didn’t hold up under deeper investigation. We <em>never</em> captured the username for
+this customer. Argh!</p>
+
+<p>Maybe this customer was using an authentication method we didn’t support?
+Possible. Some of the newer auth methods in the latest version of MySQL hadn’t
+been implemented in our sniffer yet. We implemented them. Still nothing!</p>
+
+<p>Much debugging and tcpdumping later, we found out the problem was an
+undocumented protocol feature, combined with odd client behavior, that caused us
+to ignore the username during the connection handshake.</p>
+
+<p>The good news is, for this customer and some others, we immediately saw a
+difference. In the screenshot below (lightly redacted for privacy) you can see
+how the number of <code>unknown_user</code> queries goes way down. This happens after an
+agent upgrade. Meanwhile, the number of queries attributed to known users rises
+in a nice wedge shape as new connections are established and the sniffer keeps
+track of their queries.</p>
+
+<p><img alt="Unknown User" src="https://vividcortex.com/img/articles/2015/05/unknown-user.png"/>
+</p>
+
+<p>This is not the first undocumented protocol feature we’ve found. (If you’re in
+the business of reverse engineering wire protocols, you’d better accept
+incomplete documentation as a given). We assume it won’t be the last.</p>
+
+<p>If you’re interested in reverse engineering the MySQL protocol for fun and
+profit, you should check out our <a href="https://vividcortex.com/resources/network-analyzer-for-mysql/">free tool for MySQL network
+sniffing</a>. It’s a wrapper around our
+protocol decoding libraries, and is a great way to capture query traffic off the
+wire and feed it into analysis tools.</p></div>
+    </summary>
+    <updated>2015-06-09T03:52:13Z</updated>
+    <source>
+      <id>https://vividcortex.com/</id>
+      <author>
+        <name>Vivid Cortex</name>
+      </author>
+      <link href="https://vividcortex.com/" rel="alternate" type="text/html"/>
+      <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
+      <subtitle>Recent content on VividCortex</subtitle>
+      <title>VividCortex</title>
+      <updated>2015-06-09T19:16:54Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en-us">
+    <id>https://vividcortex.com/blog/2015/06/09/in-case-you-missed-it-catena/</id>
+    <link href="https://vividcortex.com/blog/2015/06/09/in-case-you-missed-it-catena/" rel="alternate" type="text/html"/>
+    <title>In Case You Missed It - Knowing the Unknowable</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>In this webinar, Preetam Jinka addresses a new approach to fast and efficient time series storage and indexing. He covers the unique characteristics of time series data, time series indexing, and the basics of log-structured merge (LSM) trees and B-trees. After establishing some basic concepts, he explains how Catena’s design is inspired by many of the existing systems today and why it works much better than its present alternatives.</p>
+
+<p>If you did not have a chance to join the webinar, the slide deck is embedded below. You can also register for a recording <a href="https://vividcortex.com/resources/webinars/catena/">here</a>.</p></div>
+    </summary>
+    <updated>2015-06-09T00:00:00Z</updated>
+    <source>
+      <id>https://vividcortex.com/</id>
+      <author>
+        <name>Vivid Cortex</name>
+      </author>
+      <link href="https://vividcortex.com/" rel="alternate" type="text/html"/>
+      <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
+      <subtitle>Recent content on VividCortex</subtitle>
+      <title>VividCortex</title>
+      <updated>2015-06-09T19:16:54Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en-us">
+    <id>https://vividcortex.com/about-us/events/monitorama/</id>
+    <link href="https://vividcortex.com/about-us/events/monitorama/" rel="alternate" type="text/html"/>
+    <title>Monitorama</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>VividCortex is sponsoring Monitorama this year. Last year was a great experience, and we are back for more. Hope to see you there and talk open source, #monitoringlove, and all things Portland culture.</p>
+
+<p>Click <a href="http://monitorama.com/">here</a> for more details and registration.</p></div>
+    </summary>
+    <updated>2015-06-09T00:00:00Z</updated>
+    <source>
+      <id>https://vividcortex.com/</id>
+      <author>
+        <name>Vivid Cortex</name>
+      </author>
+      <link href="https://vividcortex.com/" rel="alternate" type="text/html"/>
+      <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
+      <subtitle>Recent content on VividCortex</subtitle>
+      <title>VividCortex</title>
+      <updated>2015-06-09T19:16:54Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en">
+    <id>http://redislabs.com/?p=9657</id>
+    <link href="https://redislabs.com/blog/introduction-to-redis-labs-enterprise-cluster" rel="alternate" type="text/html"/>
+    <title>Introduction to Redis Labs Enterprise Cluster (RLEC)</title>
+    <summary>We have created Redis Labs Enterprise Cluster (RLEC) to completely relieve you of the burden related to deploying, provisioning, configuring, managing and monitoring Redis. RLEC makes it really simple to ensure high-availability across racks or data-centers, create and manage a clustered Redis database and provide automatic cluster rebalancing. With RLEC, you also gain commercial support for your Redis usage, provided by Redis Labs.</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p><img alt="Redis Lab Enterprise Cluster (RLEC): Introduction" class="aligncenter size-full wp-image-10121" height="200" src="https://redislabs.com/wp-content/uploads/2015/06/2015-06-07.png" title="Redis Lab Enterprise Cluster (RLEC): Introduction" width="635"/></p>
+
+<h3 dir="ltr">Who is RLEC good for?</h3>
+
+<p dir="ltr">Redis is a great technology, it is VERY fast, it is very simple to use and at the same time very sophisticated and powerful. For these reasons Redis has seen tremendous adoption and has become a mainstay of modern day application stacks.</p>
+
+<p dir="ltr">When you need to use Redis in more complex scenarios and treat it as a full blown database (with high-availability and scalability in order to be able to grow to big datasets) or as a highly available and scalable cache, you can use enhancements like Redis Sentinel and Redis Cluster. Once again great technologies, but not trivial to get initially deployed or manage afterwards.</p>
+
+<p dir="ltr">Some customers would like to use Redis as a full blown product vs. a set of great technologies. What differentiates a technology from a product in my view is the ability to seamlessly use Redis for any need, from the most simple usage scenario, like a volatile cache on a single server, to the most complex scenario, like a huge highly-available sharded database that can span multiple servers and survive server crashes.</p>
+
+<p dir="ltr">Another aspect that differentiates using a technology vs. a product in my mind is getting a full-blown management UI to manage and monitor the Redis databases, as well as end-to-end support for your Redis deployment and how to use it.</p>
+
+<p dir="ltr">Lastly, in spite of the growing demand by companies to use open-source technologies, many companies would like the technology to be commercially supported and backed by a company that is committed to the future of the product and can provide support for any need. If you ever consult the big analyst firms, they always recommend against using the open-source technology as-is without getting commercial support for it.</p>
+
+<p dir="ltr">For the above reasons we have created Redis Labs Enterprise Cluster (RLEC): to completely relieve you of the burden related to deploying, provisioning, configuring, managing and monitoring Redis. RLEC makes it really simple to ensure high-availability across racks or data-centers, create and manage a clustered Redis database and provide automatic cluster rebalancing. With RLEC, you also gain commercial support for your Redis usage, provided by Redis Labs.</p>
+
+<h3 dir="ltr">What does RLEC give you beyond open-source Redis?</h3>
+
+<p dir="ltr">RLEC is practically a multi-tenant system that acts as a container for running multiple databases on the same cluster infrastructure. Each database can be from the following configuration:</p>
+
+<ul>
+	<li dir="ltr">Simple Redis database (i.e. a single master shard)</li>
+	<li dir="ltr">Highly-available Redis database (i.e. master / slave shards or master / multi-slave shards)</li>
+	<li dir="ltr">Redis clustered database (i.e. multiple master shards)</li>
+	<li dir="ltr">Highly-available Redis clustered database (i.e. multiple master shards each with its own slave shard, or multiple master / multi-slave shards)</li>
+</ul>
+
+<p dir="ltr">As a result, after installing RLEC (which is a simple task by itself that I will cover in an upcoming blog post) you can easily provision and manage multiple Redis databases, spanning multiple servers, while maintaining high-availability, and be able to scale up or down the databases as your needs change. You can do all of this through RLEC’s management UI, through the <code>rladmin</code> Command Line Interface (CLI), or through a REST API. In addition you can view various statistics to understand what is going on in each of your databases, each of the cluster nodes, or in the cluster as a whole. Apart from viewing these, you can sign up to receive alerts in the UI itself, and via email, as well as be notified by the cluster, on different events or thresholds, so you can be aware and take actions.</p>
+
+<p dir="ltr">There are many more advanced capabilities and logic that we have implemented as part of RLEC that are too long or sophisticated to cover in this post, but you can read more about these in the <a href="https://redislabs.com/redis-enterprise-documentation/overview" target="_blank">RLEC documentation</a>.</p>
+
+<h3 dir="ltr">Why should you trust RLEC?</h3>
+
+<p dir="ltr">It is important to note that although RLEC is inherently running the open source Redis, we, at Redis Labs, have implemented a lot of intellectual property within RLEC to better manage Redis as a highly-available and scalable database.</p>
+
+<p dir="ltr">This intellectual property has been built for several years while running the same technology as a cloud service named <a href="https://redislabs.com/redis-cloud" target="_blank"> Redis Cloud</a> that is available on all major cloud platforms (AWS, Azure, GCE, SoftLayer, etc.) and has helped thousands of our customers survive multiple server failures, as well as entire datacenter failures.</p>
+
+<p dir="ltr">What we’ve done now in RLEC is taken this technology we’ve built during the years and repackaged it as downloadable and installable software that you can install anywhere you’d like, whether on your own cloud instances, or your servers running within your private data-center. We’ve gotten demand for this ability from customers who were not able to use our cloud service for various reasons, such as customers who cannot run on a public cloud platform, customers who want to run within their virtual private cloud and cannot connect from it to an external service, or customers who need to comply to different information security standards.</p>
+
+<h3>So how do you get started with RLEC?</h3>
+
+<p>Like I indicated above, getting started with RLEC is very simple, and I will cover more detailed information on that in a future post, but you can probably figure it out yourself using our documentation and get started by:</p>
+
+<ol>
+	<li>Download RLEC from <a href="https://redislabs.com/redis-enterprise-downloads" target="_blank">https://redislabs.com/redis-enterprise-downloads</a></li>
+	<li>Follow the instructions at <a href="https://redislabs.com/redis-enterprise-documentation/installing-and-upgrading/accessing-and-installing-the-setup-package" target="_blank">https://redislabs.com/redis-enterprise-documentation/installing-and-upgrading/accessing-and-installing-the-setup-package</a></li>
+</ol>
+
+<div>If you have any feedback or questions please don’t hesitate to reach out to me at: <a href="mailto:itai.raz@redislabs.com">itai.raz@redislabs.com</a>.</div>
+
+<p><a href="https://redislabs.com/redis-enterprise-downloads" target="_blank"><img alt="" class="aligncenter size-full wp-image-9953" height="200" src="https://redislabs.com/wp-content/uploads/2015/06/download-now.png" title="RLEC - Download Now!" width="635"/></a></p></div>
+    </content>
+    <updated>2015-06-08T13:00:14Z</updated>
+    <category term="Uncategorized"/>
+    <author>
+      <name>Itai Raz</name>
+    </author>
+    <source>
+      <id>https://redislabs.com</id>
+      <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
+      <link href="https://redislabs.com" rel="alternate" type="text/html"/>
+      <title>Redis Labs</title>
+      <updated>2015-06-09T19:16:52Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en-us">
+    <id>https://vividcortex.com/resources/network-analyzer-for-redis/</id>
+    <link href="https://vividcortex.com/resources/network-analyzer-for-redis/" rel="alternate" type="text/html"/>
+    <title>Network Analyzer for Redis</title>
+    <summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>VividCortex’s network traffic analyzer tool for Redis is an easy-to-use, non-intrusive way to gain insight into your server’s activity. Built for Redis servers running on Linux operating systems, it will help you understand your query workload.</p>
+
+<p>This commandline tool captures TCP traffic on your server and decodes the protocol. It decodes queries and outputs them in a standard log format. You can use standard log analysis tools such as Percona Toolkit’s pt-query-digest to analyze the output and build insight into queries and server performance.</p>
+
+<p>The tool is built on VividCortex’s advanced network traffic capture technology
+and is also a safe way to assess how VividCortex’s agents will behave on your
+systems.  It is a thin wrapper around our TCP and Redis decoding
+libraries. It does nothing but decode and print, and makes no attempt to
+communicate with the Internet or anything else. Simple, secure, and smart.</p>
+
+<p>System requirements:</p>
+
+<ul>
+<li>64-bit Linux operating system</li>
+<li>Commandline access to the server with root privileges</li>
+</ul>
+
+<p>We offer free tools
+for analyzing the following network protocols:
+<a href="https://vividcortex.com/../network-analyzer-for-mysql/">MySQL</a>,
+<a href="https://vividcortex.com/../network-analyzer-for-mongodb/">MongoDB</a>,
+<a href="https://vividcortex.com/../network-analyzer-for-postgresql/">PostgreSQL</a>, and
+<a href="https://vividcortex.com/../network-analyzer-for-redis/">Redis</a>.</p>
+
+<p>Fill out the form below to receive your free download.</p></div>
+    </summary>
+    <updated>2015-06-05T00:00:00Z</updated>
+    <source>
+      <id>https://vividcortex.com/</id>
+      <author>
+        <name>Vivid Cortex</name>
+      </author>
+      <link href="https://vividcortex.com/" rel="alternate" type="text/html"/>
+      <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
+      <subtitle>Recent content on VividCortex</subtitle>
+      <title>VividCortex</title>
+      <updated>2015-06-09T19:16:54Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en">
+    <id>http://redislabs.com/?p=9946</id>
+    <link href="https://redislabs.com/blog/nosql-performance-aerospike-cassandra-datastax-couchbase-redis" rel="alternate" type="text/html"/>
+    <title>Rising NoSQL Star: Aerospike, Cassandra, Couchbase or Redis?</title>
+    <summary>"I always knew I was a star, and now the rest of the world seems to agree with me." — Freddie Mercury</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p><img alt="" class="aligncenter size-full wp-image-9953" height="200" src="https://redislabs.com/wp-content/uploads/2015/06/2015-06-04.png" title="Rising NoSQL Star: Redis outshines the competition, leaves 2nd places for Aerospike, Cassandra and Couchbase" width="635"/> </p>
+
+<blockquote>
+	<p dir="ltr">"I always knew I was a star, and now the rest of the world seems to agree with me." — Freddie Mercury</p>
+</blockquote>
+
+<p>A new NoSQL benchmark was just released by <a href="http://www.avalonconsult.com/" target="_blank">Avalon Consulting, LLC</a>, and I couldn’t be happier to brag that Redis out-performed its competitors by a landslide. With more than double the throughput and half the latency of other NoSQL databases, our Redis Labs Enterprise Cluster dominated in a real-world application scenario. The Avalon benchmark report is <a href="http://redislabs.com/cbc-2015-15-nosql-benchmark" target="_blank">freely available here</a> and the results speak for themselves.</p>
+
+<p><a href="https://redislabs.com/cbc-2015-15-nosql-benchmark" target="_blank"><img class="aligncenter size-full" src="https://redislabs.com/wp-content/images/lp/2015-q2/graph.png" title="Rising NoSQL Star: Redis outshines the competition, leaves 2nd places for Aerospike, Cassandra and Couchbase"/></a></p>
+
+<p>But before we get into all the fun background on this particular test, let’s acknowledge a few things about benchmarks. There's no way around it - performing meaningful comparisons between NoSQL solutions is a hard task. That is because of benchmarking's "original sin" — results from any benchmark are truly relevant only to the specific application that was used for the test (see <a href="https://gist.github.com/itamarhaber/2dad94e3bdd2980bce73" target="_blank">Haber's Benchmarking Theorem</a>). This fact is compounded by the diverse capabilities of all the different NoSQL databases. Typical benchmark models tend to generalize a specific use case, and in the process they distance themselves from the underlying data management system and fail to leverage its strengths.</p>
+
+<p dir="ltr">This by itself is hardly news and the past is riddled with attempts at <a href="https://redislabs.com/blog/nosql-bar-datastax-aerospike-couchbase-redis-google-cloud-platform" target="_blank">comparing apples to oranges</a>. I gave an entire presentation at RedisConf 20Fifteen on this subject ( <a href="https://www.youtube.com/watch?v=aotCPUtahDU" target="_blank">"Benchmarking Redis By Itself and Versus Other NoSQL Databases"</a>). If you've watched it then you already know I believe that the only way to compare apples with oranges is through an applicative benchmark, in which the test application is optimized independently for each DBMS. That RedisConf talk, it turns out, was only the warm-up act for a session by Lahav Savir, CEO of <a href="http://www.emind.co/" target="_blank">Emind</a>, who presented a real life benchmark using that exact approach (<a href="https://www.youtube.com/watch?v=aotCPUtahDU&amp;t=20m02s" target="_blank">"Real-Time Vote Platform Benchmark"</a>).</p>
+
+<p dir="ltr">Emind's use case is a great example of how Redis is put to use in tackling some of the hairier challenges that real-time analytics presents in the context of Big Data and the IoT. The story behind Emind's benchmark brings together all my passions: data, people, technology and the cloud. It is a brilliant experiment designed to identify the best-performing NoSQL database for a real-time voting platform. The voting platform supports large events such as televised talent shows (think "American Idol" or "Rising Star"), where the audience is actively involved and directs the course of the show by voting. The volume and velocity of votes that must be tallied as they come in is staggering, so the platform’s performance must have superstar qualities (much like the shows' participants) to support that kind of traffic.</p>
+
+<p dir="ltr">Emind's team identified several NoSQL technologies that could potential power their platform: Aerospike, Cassandra, Couchbase and Redis. While all candidates seemed promising, Emind needed to be sure that it chose the database that would best meet its requirements. To do that, Emind's engineers built a <a href="https://github.com/emind-systems/real_time_vote_benchmark" target="_blank">mock application</a> ("mockapp") in Go that simulated the voting process and tailored it to use each of the different candidates.</p>
+
+<p dir="ltr">Emind then solicited the services of Avalon Consulting, LLC to ensure the benchmark was executed optimally and impartially. Avalon reviewed and optimized the mockapp's source code, approached each database vendor (Aerospike, Datastax, Couchbase and Redis Labs) for guidance and certification of its respective solution's deployment, executed the benchmark and compiled a <a href="http://redislabs.com/cbc-2015-15-nosql-benchmark" target="_blank">comprehensive report</a> with the results. Check out the full write-up to find out more about how my favorite performer is a rocking superstar. Questions? Feedback? <a href="mailto:itamar@redislabs.com">Email</a> or <a href="https://twitter.com/itamarhaber" target="_blank">tweet</a> me – I'm highly available :)</p></div>
+    </content>
+    <updated>2015-06-04T13:00:16Z</updated>
+    <category term="Uncategorized"/>
+    <author>
+      <name>Itamar Haber</name>
+    </author>
+    <source>
+      <id>https://redislabs.com</id>
+      <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
+      <link href="https://redislabs.com" rel="alternate" type="text/html"/>
+      <title>Redis Labs</title>
+      <updated>2015-06-09T19:16:53Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en-US">
+    <id>http://blog.pivotal.io/?p=32930</id>
+    <link href="http://blog.pivotal.io/big-data-pivotal/features/6-free-technical-classes-from-pivotal-education" rel="alternate" type="text/html"/>
+    <title>6 Free Technical Classes From Pivotal Education</title>
+    <summary>Pivotal Education makes it easy to fully realize the capabilities of our technologies by offering a series of free training courses. Designed for developers, system architects, and data practitioners, these online courses engage students through a sandbox environment and interactive labs. The introductory courses enable technologists at any point of engagement with Pivotal technologies — whether during evaluation or after deployment — to become more well-versed, efficient, and effective in their efforts.  The current classes provide hands-on experience with Pivotal technologies such as Pivotal HD, Pivotal Cloud Foundry, Pivotal Greenplum Database, HAWQ, Redis, and GemFire.</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p><img alt="sfeatured-pivotal-education-free" class="alignleft wp-image-33049 size-full" height="220" src="http://blog.pivotal.io/wp-content/uploads/2015/06/sfeatured-pivotal-education-free.png" width="440"/>Pivotal Education makes it easy to fully realize the capabilities of our technologies by offering a series of free introductory training courses. Ideal for developers, system architects, and data practitioners, these online courses engage students through a hands-on, sandbox lab environment and provide a technical foundation for more advanced topics taught in other Pivotal courses. The offerings are also uniquely designed to enable technologists at any point of engagement with Pivotal—whether during evaluation or after deployment—to become more well-versed, efficient, and effective in their efforts.</p>
+<p>Our free, introductory training classes span across a wide array of Pivotal technologies, including:  <a href="http://pivotal.io/big-data/pivotal-hd" target="_blank">Pivotal HD</a>, <a href="http://pivotal.io/platform-as-a-service/pivotal-cloud-foundry" target="_blank">Pivotal Cloud Foundry</a>, <a href="http://pivotal.io/big-data/pivotal-greenplum-database" target="_blank">Pivotal Greenplum Database</a>, Pivotal <a href="http://pivotal.io/big-data/pivotal-hawq" target="_blank">HAWQ</a>, <a href="http://redis.io/" target="_blank">Redis</a>, and <a href="http://pivotal.io/big-data/pivotal-gemfire" target="_blank">Pivotal GemFire</a>.</p>
+<p><strong><a href="http://pivotal.io/training#introduction-to-greenplum-database" target="_blank">Intro to Pivotal Greenplum Database</a></strong><br/>
+This course is designed to provide an introduction to students new to Pivotal Greenplum Database (GPDB). As a one day course, students will gain a high level overview of features found in GPDB. This introduction will serve as a foundation for further courses that are offered for administrators, DBAs and end users of GPDB.</p>
+<p><strong><a href="http://pivotal.io/training#introduction-to-gemfire" target="_blank">Intro to GemFire</a></strong><br/>
+This course is designed to provide an introduction to students new to Pivotal GemFire. As a 1 day course, students will gain a high level overview of features found in GemFire. This introduction will serve as a foundation for further courses that are offered for administrator, developers and architects using GemFire. Some basic high level lab exercises are also offered to enhance the learning experience.</p>
+<p><strong><a href="http://pivotal.io/training#introduction-to-pivotal-hd" target="_blank">Intro to Pivotal HD</a></strong><br/>
+This course is designed to provide an introduction to students new to the advanced analytic capabilities of Pivotal HD, our <a href="https://hadoop.apache.org/" target="_blank">Apache Hadoop®</a> distribution. As a one day course, students will gain a high level overview of features found in the Pivotal HD. This introduction will serve as a foundation for further courses that are offered for administrators and architects using Pivotal HD.</p>
+<p><strong><a href="http://pivotal.io/training#ntroduction-to-pivotal-hd-and-hawq" target="_blank">Intro to Pivotal HAWQ</a></strong><br/>
+This course is designed to provide an introduction to students new to running SQL on Hadoop®. In this one day course, students will gain a high level overview of features found in HAWQ. This introduction will serve as a foundation for further courses that are offered for administrators, architects and end users of HAWQ.</p>
+<p><strong><a href="http://pivotal.io/training#enterprise-paas" target="_blank">Intro to Pivotal Cloud Foundry</a></strong><br/>
+This course provides students with the concepts and hands-on experience needed to work with and deploy applications on Pivotal Cloud Foundry. Students will gain familiarity in general Cloud Foundry concepts (applications, buildpacks, manifests, organizations, spaces, users, roles, domains, routes, services), how to push applications to Cloud Foundry in various languages, services, user provided services, manifests, YAML, environment variables, autoconfiguration, logging and loggregator.</p>
+<p><strong><a href="http://pivotal.io/training#introduction-to-redis" target="_blank">Intro to Redis (2 day course)</a></strong><br/>
+This hands-on course provides a broad overview of the Redis NoOSQL datastore, starting with an explanation of product functionality and typical use cases. Students will learn how to install and configure Redis, and examine some of the common commands for manipulating data. They will have the opportunity to create a simple Redis Java application, and review tips and techniques for improving performance. The course explains the use of persistence and replication in Redis, and also includes coverage of some administrative topics such as security and monitoring.</p>
+<p>Whether you are evaluating Pivotal’s products for your company, have already deployed these technologies, or are a student training looking to expand your skillset, Pivotal Education courses present an opportunity to become well-versed in these topics with minimal time commitment and no financial cost.</p>
+<p><a href="http://pivotal.io/training" target="_blank"><b>Learn more about Pivotal’s Education and Training Courses</b></a></p></div>
+    </content>
+    <updated>2015-06-01T22:21:02Z</updated>
+    <category term="Features"/>
+    <category term="GemFire"/>
+    <category term="Greenplum Database"/>
+    <category term="HAWQ"/>
+    <category term="Pivotal Cloud Foundry"/>
+    <category term="Pivotal HD"/>
+    <category term="Redis"/>
+    <author>
+      <name>Brian Reitz</name>
+    </author>
+    <source>
+      <id>http://blog.pivotal.io</id>
+      <link href="http://blog.pivotal.io/tag/redis/feed" rel="self" type="application/rss+xml"/>
+      <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
+      <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
+      <title>Pivotal P.O.V. » Redis</title>
+      <updated>2015-06-09T19:16:49Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en">
+    <id>http://redislabs.com/?p=9738</id>
+    <link href="https://redislabs.com/blog/nosql-bar-datastax-aerospike-couchbase-redis-google-cloud-platform" rel="alternate" type="text/html"/>
+    <title>A Guy Walks Into a NoSQL Bar [Director's Cut]</title>
+    <summary>Comparisons are as hard to do right as they are easy to do wrong and when the subjects of comparison are different the problem is only compounded. Therefore, when practicing comparative “advertising” I often feel that the results begotten should be interpreted in spirit rather be presented as numbers to quibble about. With that in mind, let me share a brief related story...</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p><img alt="A Guy Walks Into a NoSQL Bar" class="aligncenter size-full wp-image-9745" height="200" src="https://redislabs.com/wp-content/uploads/2015/05/20150529-art.png" title="A Guy Walks Into a NoSQL Bar" width="635"/></p>
+
+<h2 dir="ltr">or DataStax, Aerospike, Couchbase and Redis Labs: Serving 1M Writes/Sec From Google Compute Engine</h2>
+
+<p dir="ltr">A couple of months ago I published a post over at the Google Cloud Platform blog called <a href="http://googlecloudplatform.blogspot.com/2015/04/a-guy-walks-into-a-NoSQL-bar-and-asks-how-many-servers-to-get-1Mil-ops-a-second.html" target="_blank">"A guy walks into a NoSQL bar and asks: how many servers to get 1 million ops. a second?" </a> That particular post had gone through several editing cycles and I'm very happy with the final result. When I wrote that particular post, I abbreviated my cheeky story, but given <a href="http://blog.couchbase.com/couchbase-server-hits-1m-writes-with-3b-items-with-50-nodes-on-google-cloud" target="_blank">Couchbase's recent announcement</a> about getting to 1M writes/sec with <strong>only 50 servers (!)</strong>, I thought it would be relevant to share the full glory of my analogy here.</p>
+
+<p><strong>Note:</strong> the joke is still not very funny – suggestions for improvement are welcome!</p>
+
+<h3 dir="ltr">Preface</h3>
+
+<p dir="ltr">Comparisons are as hard to do right as they are easy to do wrong and when the subjects of comparison are different the problem is only compounded. Therefore, when practicing comparative “advertising” I often feel that the results begotten should be interpreted in spirit rather be presented as numbers to quibble about. With that in mind, let me share a brief related story…</p>
+
+<h3 dir="ltr">Prologue</h3>
+
+<p dir="ltr">A guy walks into a NoSQL bar looking quite upset. "Can I have a glass of red wine and a glass of white wine?" he asks the bartender. "Right away sir," says the bartender, "but may I ask why the long face?" "I was in that other NoSQL bar further down the road, the Spiky Aerrow," answers the patron, "and asked for that exact same order. The server there is known for his speed (some people swear he can do several things at once) as well as the amazing way he prepares drinks, so I was kind of expecting a show."</p>
+
+<p>The bartender, whose bar has been open for quite a few years, nods sympathetically and says, "I'm guessing he didn't quite dazzle you?" "On the contrary," replies the customer, it was an awesome show. To prepare my glass of red, that spectacular master of liquids uncorked no less than 30 bottles of wine in a fraction of a second! He then continued by whirlwinding between all these bottles and pouring a little wine from each into my glass. A lot of wine splashed around and spilled, given the speeds involved, but it was a heck of a show. And then, he did the same thing for the white… but with 50 bottles!"</p>
+
+<h3 dir="ltr">Introduction</h3>
+
+<p dir="ltr">Some time ago, we at Redis Labs set out to answer the question: "How many Google Compute Engine nodes do you need to serve 1 million write operations per second?" The question, besides sounding like a variation of the lightbulb joke, is quite open-ended in terms of defining the actual nature of the write operation based on <a href="http://googlecloudplatform.blogspot.com/2014/12/aerospike-hits-one-million-writes-Per-Second-with-just-50-Nodes-on-Google-Compute-Engine.html" target="_blank"> previous</a> <a href="http://googlecloudplatform.blogspot.com/2014/03/cassandra-hits-one-million-writes-per-second-on-google-compute-engine.html" target="_blank">work</a> on the subject. Given our experience with cloud platforms in general, and particularly with Google's, we were fairly confident that we'd need only a few so we set out to find out.</p>
+
+<h3 dir="ltr">Benchmark Setup</h3>
+
+<p dir="ltr">To run the benchmark, we chose the biggest Google Compute Engine nodes currently available in us-central – the n1-highcpu-16 type – and we ended up using just two such servers to run our Redis Labs Enterprise Cluster software (freely downloadable from <a href="https://redislabs.com/redis-enterprise-downloads" target="_blank">here</a>). We used another pair of servers – this time n1-highcpu-8 – to generate the load with <a href="https://github.com/RedisLabs/memtier_benchmark" target="_blank">memtier_benchmark</a> using the following command line arguments:</p>
+
+<p><code>memtier_benchmark -s 10.0.0.1 -p 6379 --ratio=1:1 --test-time=120 -d 100 -t 2 -c 50 --pipeline=50 --ratio=1:0</code></p>
+
+<h3 dir="ltr">Benchmark Results</h3>
+
+<p dir="ltr">We ran the benchmark three times, first serving only reds reads, then serving only <s>whites</s> writes, and finally both in equal mix. Here are the results from those tests:</p>
+
+<ol>
+	<li dir="ltr">For read-only operations, our Redis database provided throughput of <strong>1.29M read operations per second</strong> at an average latency of 0.15 millisecond per operation.</li>
+	<li dir="ltr">With the write-only load, the cluster's measured throughput was at <strong>1.14M operations per second</strong> at 0.36sec average latency per request.</li>
+	<li dir="ltr">An equal mix of read and write operations gave a throughput of <strong>1.16M operations per second</strong> at an average latency of 0.17msec per operation.</li>
+</ol>
+
+<p><img alt="Redis Labs Enterprise Cluster on Google Cloud Platform - Over 1M ops/sec" class="aligncenter size-full wp-image-9741" height="492" src="https://redislabs.com/wp-content/uploads/2015/05/20150529-nosql-bar-graph.png" title="Redis Labs Enterprise Cluster on Google Cloud Platform - Over 1M ops/sec" width="789"/></p>
+
+<p> </p>
+
+<h3 dir="ltr">Conclusion</h3>
+
+<p dir="ltr">Redis needed only two Google Cloud Engine servers in the cluster to cross the 1M op/sec threshold.</p>
+
+<h3 dir="ltr">Epilogue</h3>
+
+<p dir="ltr">Before the man can finish his story, the bartender had finished preparing the order (using just one bottle of white and one bottle of red, mind you). He placed the drinks alongside the bill in front of the customer, and said "sounds like an amazing show indeed, but I still don't understand why you're so unhappy." "I'll tell you why," answered the man, "guess who had to pay for all 80 bottles of spilled wine?"</p>
+
+<p dir="ltr">The barman smiled and said, "You should consider yourself lucky then, sir. I heard of a place further uptown called Dat Stacks where for every glass of white wine they charge for 300 bottles."</p>
+
+<p><img alt="1M Ops/Sec on Google Cloud Platform: Your bill, sir" class="aligncenter size-full wp-image-9743" height="1670" src="https://redislabs.com/wp-content/uploads/2015/05/20150529-nosql-bar-info.png" title="1M Ops/Sec on Google Cloud Platform: Your bill, sir" width="1566"/></p>
+
+<p dir="ltr">Ok, so maybe this joke isn't really that funny, but neither is paying too much for less-than-top-notch performance :) With Redis, reaching and exceeding the 1 million operations per second mark doesn't require a truckload of cloud servers – just one or two will do nicely.</p></div>
+    </content>
+    <updated>2015-05-29T16:45:56Z</updated>
+    <category term="Uncategorized"/>
+    <author>
+      <name>Itamar Haber</name>
+    </author>
+    <source>
+      <id>https://redislabs.com</id>
+      <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
+      <link href="https://redislabs.com" rel="alternate" type="text/html"/>
+      <title>Redis Labs</title>
+      <updated>2015-06-09T19:16:52Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en">
+    <id>http://redislabs.com/?p=9611</id>
+    <link href="https://redislabs.com/blog/redis-labs-at-mongodb-world" rel="alternate" type="text/html"/>
+    <title>Redis Labs at MongoDB World!</title>
+    <summary>The Redis Labs team will be in New York next month to sponsor MongoDB World, MongoDB’s largest end user event, which brings together thousands of Mongo developers, enthusiasts, and influencers from around the world. The event will take place on June 1 – 2 at the Manhattan Sheraton in New York City and welcomes developers and ecosystem partners like Redis Labs. MongoDB and Redis offer complimentary uses cases for both startup and enterprise developers. As …</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p dir="ltr"><img alt="Redis Cloud - 30MB RAM, 30 Connections for FREE" class="alignnone size-full wp-image-9594" height="200" src="https://redislabs.com/wp-content/uploads/2015/05/mongo-db.png" title="Redis Labs at MongoDB World!" width="635"/></p>
+
+<p>The Redis Labs team will be in New York next month to sponsor MongoDB World, MongoDB’s largest end user event, which brings together thousands of Mongo developers, enthusiasts, and influencers from around the world.</p>
+
+<p>The event will take place on June 1 – 2 at the Manhattan Sheraton in New York City and welcomes developers and ecosystem partners like Redis Labs. MongoDB and Redis offer complimentary uses cases for both startup and enterprise developers. As we’ve <a href="https://redislabs.com/blog/database-usage-survey-of-aws-reinvent-2014-developers">shared in the past</a>, we find that many developers who use Redis choose to use a wide variety of databases together, including MongoDB and MySQL, to solve a range of challenges for performance-driven use cases.</p>
+
+<p>As usual, the Redis Labs team has a great lineup of activities planned for the event, including:</p>
+
+<ul>
+	<li><strong>Awesome Redis Swag.</strong> Stop by our booth to pick up our popular Redis Geek shirts, onesies and laptop swag!</li>
+	<li><strong>Featured Speaking Session.</strong> Our very own Itamar Haber, Chief Developer Advocate, will be giving a speaking session entitled “Redis &amp; MongoDB: Stop Big Data Indigestion Before It Starts” on June 2nd at 10:00am. Join us for a highly actionable talk and lively Q&amp;A!</li>
+	<li><strong>1-on-1 Meetings.</strong> Book a meeting with any of our team members to discuss how to tap into Redis' performance.</li>
+</ul>
+
+<p>Questions? Feel free to <a href="mailto:cameron@redislabs.com" target="_blank">email me</a> or reach out on <a href="https://twitter.com/cameronperon" target="_blank">Twitter!</a></p></div>
+    </content>
+    <updated>2015-05-21T09:27:07Z</updated>
+    <category term="Uncategorized"/>
+    <author>
+      <name>Cameron Peron</name>
+    </author>
+    <source>
+      <id>https://redislabs.com</id>
+      <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
+      <link href="https://redislabs.com" rel="alternate" type="text/html"/>
+      <title>Redis Labs</title>
+      <updated>2015-06-09T19:16:52Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en-US">
+    <id>http://blog.pivotal.io/?p=11883</id>
+    <link href="http://blog.pivotal.io/big-data-pivotal/products/pivotal-data-roadshow-a-view-from-the-road" rel="alternate" type="text/html"/>
+    <title>Pivotal Data Roadshow: A View From the Road</title>
+    <summary>The response to the Pivotal Data Roadshow, held in a number of cities across North America this month, has been quite impressive. It clearly demonstrates the customer and market demand for hands-on experience and training with big data technologies.  Our initial events have been over capacity, with packed houses numbering nearly 100 attendees in each city.  The response represents the massive progress within the open source Apache Hadoop ecosystem in recent years, and the degree to which Hadoop has been embraced within the enterprise to handle big data storage and analytics workloads.</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p><img alt="featured-BigDataRoadshow" class="alignleft size-full wp-image-11895" height="200" src="http://blog.pivotal.io/wp-content/uploads/2015/04/featured-BigDataRoadshow.png" width="200"/>People in the market are hungry for hands-on experience and training with big data technologies.  We are seeing this through the dramatic response to the <a href="https://pivotal.io/big-data/data-roadshow" target="_blank" title="Pivotal Data Roadshow">Pivotal Data Roadshow</a>, which is touring cities across North America this month.  We have been packing the house with nearly 100 participants in each city.  We think this is a good gauge of just how much Apache HadoopⓇ and <a href="http://pivotal.io/big-data/hadoop/sql-on-hadoop" target="_blank" title="SQL on Hadoop">SQL on Hadoop</a> have been embraced within the enterprise to handle big data storage and analytics workloads.</p>
+<p>Big Data technology continues to advance quickly. Just 18 months ago, Pivotal released the world’s first closed-loop platform for analytics and data-driven applications. While big data and <a href="http://hadoop.apache.org" target="_blank" title="Apache Hadoop&#x24C7;">Apache HadoopⓇ</a> were moving from niche concerns to tech buzzword status, Pivotal was merging HadoopⓇ with <a href="http://pivotal.io/big-data/pivotal-hawq" target="_blank" title="HAWQ">HAWQ</a>, a robust SQL-on-Hadoop engine, and with real time and <a href="http://pivotal.io/big-data/pivotal-gemfire" target="_blank" title="in-memory data processin">in-memory data processing</a> to round out our vision of how companies should operationalize big data over a <a href="http://pivotal.io/big-data/businessdatalake" target="_blank" title="Business Data Lake">Business Data Lake</a>. It is exciting for us to learn from the roadshows that enterprises are now eagerly embracing SQL-on-Hadoop and in-memory processing technologies to solve business problems, substantiating Pivotal’s strategy and investments over the past five years.</p>
+<p>Attendees of the Pivotal Data Roadshows have included executives, administrators and operations staff, developers, data scientists, and even college students. This variety demonstrates the enormous impact these technologies have on entire industries today and how important they are to each of their futures. Many people in our audiences have already been leveraging our Data Lake solutions as <a href="http://pivotal.io/big-data/pivotal-big-data-suite" target="_blank" title="Pivotal Big Data Suite">Pivotal Big Data Suite</a> customers. These attendees have been impressed by <a href="http://blog.pivotal.io/big-data-pivotal/news-2/pivotal-big-data-suite-open-agile-cloud-ready" target="_blank" title="new customer-centric entitlements">new customer-centric entitlements</a> within the Pivotal Big Data Suite, which includes an instance of <a href="http://pivotal.io/platform-as-a-service/pivotal-cloud-foundry" target="_blank" title="Pivotal Cloud Foundry">Pivotal Cloud Foundry</a>, as well as powerful new additions for real time data ingestion and analysis via tools such as <a href="http://blog.pivotal.io/pivotal/products/spring-xd-for-real-time-analytics" target="_blank" title="Spring XD">Spring XD </a>and <a href="http://blog.pivotal.io/pivotal/case-studies-2/using-redis-at-pinterest-for-billions-of-relationships" target="_blank" title="Redis">Redis</a>.</p>
+<p><img alt="image01" class="alignnone size-full wp-image-11897" height="466" src="http://blog.pivotal.io/wp-content/uploads/2015/04/image011.png" width="615"/></p>
+<p>Demonstrating another key component of <a href="http://pivotal.io/new-approach-to-big-data" target="_blank" title="our 2015 strategy">our 2015 strategy</a>, the entire technical portion of the Pivotal Data Roadshow really highlights our robust cloud capabilities. All our attendee sessions are hosted in an enterprise public cloud infrastructure, spun up quickly and seamlessly in minutes.  This enables us to rapidly provision 50 IoT analytics labs across our entire product set. Attendees quickly initiate analytics workflows that ingest Twitter streams and execute real time analytics across our in memory database, Gemfire. Most impressively, this all gets developed in under 5 minutes, using only two Spring XD commands, replacing what used to be hours of complex and specialized programming.  Spring XD really has emerged as the star of the show, thanks to the streamlined, easy-to-understand interface it provides for our products, third party technologies, and its ability to manage either private, public, big, or fast data jobs.</p>
+<p>Attendees have stayed hours past the scheduled end time, enjoying building out new analytics pipelines with our expert engineering teams. They also left with their lab environments equipped to continue their experiences on their own cloud, learning into the future.</p>
+<p>If you’re interested in how big data and advanced analytics are changing companies, and would like to get your hands directly on the world’s best technology for leveraging them, be sure to check out one of the upcoming Pivotal Data Roadshows.</p>
+<p><img alt="image00" class="alignnone size-full wp-image-11898" height="273" src="http://blog.pivotal.io/wp-content/uploads/2015/04/image001.png" width="787"/></p>
+<p><b>Upcoming Dates for the Pivotal Data Roadshow</b></p>
+<ul>
+<li>Toronto, April 14</li>
+<li>New York City, April 16</li>
+<li>Washington, DC, April 21</li>
+<li>Atlanta, April 23</li>
+<li>Denver, April 28</li>
+<li>Dallas/Fort Worth, April 30</li>
+</ul>
+<p><b>Further information:</b></p>
+<ul>
+<li><a href="https://pivotal.io/big-data/data-roadshow" target="_blank" title="Register for the Pivotal Data Roadshow">Register for the Pivotal Data Roadshow</a></li>
+<li><a href="http://pivotal.io/big-data/pivotal-big-data-suite" target="_blank" title="Learn more about the Pivotal Big Data Suite">Learn more about the Pivotal Big Data Suite</a></li>
+<li>Learn more about <a href="http://blog.pivotal.io/pivotal/products/spring-xd-for-real-time-analytics" target="_blank" title="Spring XD">Spring XD</a> and <a href="http://blog.pivotal.io/pivotal/case-studies-2/using-redis-at-pinterest-for-billions-of-relationships" target="_blank" title="Redis">Redis</a></li>
+</ul>
+<p><i>Editor’s Note: Apache, Apache Hadoop, Hadoop, and the yellow elephant logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</i></p></div>
+    </content>
+    <updated>2015-04-06T15:09:30Z</updated>
+    <category term="Products"/>
+    <category term="big data"/>
+    <category term="Big Data Suite"/>
+    <category term="Cloud Foundry"/>
+    <category term="Redis"/>
+    <category term="Spring XD"/>
+    <author>
+      <name>Michael Cucchi</name>
+    </author>
+    <source>
+      <id>http://blog.pivotal.io</id>
+      <link href="http://blog.pivotal.io/tag/redis/feed" rel="self" type="application/rss+xml"/>
+      <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
+      <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
+      <title>Pivotal P.O.V. » Redis</title>
+      <updated>2015-06-09T19:16:49Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en-US">
+    <id>http://blog.pivotal.io/?p=10844</id>
+    <link href="http://blog.pivotal.io/pivotal/case-studies-2/mobile-video-big-data-architecture-with-spring-xdhadoophawqredis-measuring-live-usage" rel="alternate" type="text/html"/>
+    <title>Mobile Video Big Data Architecture with Spring XD/Hadoop/HAWQ/Redis: Measuring Live Usage</title>
+    <summary>In this post, Allan Baril, Pivotal Lab’s Director for the Internet of Things, outlines the architecture and approach taken by a major sports network and mobile carrier to create better analytics on the big data associated with live sports broadcasts on mobile phones. He explains the architecture of the entire data lifecycle—from mobile phone JSON heartbeats to Spring XD ingest, HDFS storage to SQL via HAWQ, and Spring XD batches into Redis with reports using Angular.js, and D3.js.</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p><a href="http://blog.pivotal.io/wp-content/uploads/2014/10/featured-football-spectators-phone.jpg"><img alt="featured-football-spectators-phone" class="alignleft size-full wp-image-10870" height="200" src="http://blog.pivotal.io/wp-content/uploads/2014/10/featured-football-spectators-phone.jpg" width="200"/></a>Earlier this year, <a href="http://www.emarketer.com/Article/Tablets-Challenge-PCs-Leading-Digital-Video-Channel-US/1010807" target="_blank" title="mobile video usage overtook video usage on personal computers">mobile video usage overtook video usage on personal computers</a> and research continues to show how important mobile video is to consumers. With these trends, mobile carriers and media companies are trying to learn more about usage to improve user experience and advertising revenues, especially with big advertising money makers like sports.</p>
+<p>Earlier this year, a major sports network and mobile carrier approached Pivotal to create a system for measuring cellular data and live video usage through mobile applications. The approach used <a href="http://projects.spring.io/spring-xd/" target="_blank" title="Spring XD">Spring XD</a>, <a href="http://www.pivotal.io/big-data/pivotal-hd" target="_blank" title="Pivotal HD">Pivotal HD</a>, <a href="http://www.pivotal.io/big-data/redis" target="_blank" title="Redis">Redis</a>, and <a href="http://projects.spring.io/spring-boot/" target="_blank" title="Spring Boot">Spring Boot</a> to quickly build a big data platform and set of analytical dashboards. The resulting analytics application is helping business executives from both companies understand how live video is used and what peak data usage looks like. The whole project only took a few resources and a few months.</p>
+<h2><strong>Mobile/Media Big Data Architecture Overview</strong></h2>
+<p>At a high level, data moves through a factory as depicted in the diagram below. Raw data is captured from mobile phones in JSON format by a Spring XD cluster where several processes are performed. The data is then stored in an HDFS cluster where Spring XD batch jobs use SQL via the HAWQ interface to HDFS and store the calculated reports in Redis. Spring Boot is then used with Angular.js and D3.js to show analytics to end users.</p>
+<p><a href="http://blog.pivotal.io/wp-content/uploads/2014/10/ProLeague+Mobile-SolutionsArchitecture.png"><img alt="ProLeague+Mobile-SolutionsArchitecture" class="alignnone size-full wp-image-10871" height="239" src="http://blog.pivotal.io/wp-content/uploads/2014/10/ProLeague+Mobile-SolutionsArchitecture.png" width="615"/></a></p>
+<h2><strong>Capturing Raw Data from Mobile Devices in JSON</strong></h2>
+<p>To produce the raw data, a mobile device is instrumented to capture the number of bytes used while viewing a video. The mobile application sends a “heartbeat” message that is formatted in JSON and contains the number of bytes consumed since the last report. Generally, the mobile app sends one of these reports every minute. Since there can be a large number of viewers during a live game, the system receives millions of heartbeat messages per hour. When designing the system, we decided to keep all of the heartbeat data over time, as with the concept of keeping all data inside a <a href="http://blog.pivotal.io/pivotal/news-2/from-data-silos-to-data-lakes-realizing-the-accessible-dream" target="_blank" title="data lake">data lake</a>. This way, teams could use the data to produce additional analysis in the future. In addition, the customers had a quick timeline. They needed the system in place prior to the start of the next sports season.</p>
+<h2><strong>Ingesting and Processing Data with Spring XD and HDFS</strong></h2>
+<p>To handle the data ingestion, the Pivotal team utilized <a href="http://projects.spring.io/spring-xd/" target="_blank" title="Spring XD">Spring XD</a> to receive and transform the raw data. The processed data was stored in an <a href="http://hadoop.apache.org" target="_blank" title="Apache Hadoop">Apache Hadoop®</a> File System (HDFS) cluster as part of <a href="http://www.pivotal.io/big-data/pivotal-hd" target="_blank" title="Pivotal HD">Pivotal HD</a>. Spring XD and HDFS provided a flexible, scalable solution to handle the massive amount of incoming JSON heartbeat data—as much as a half terabyte per season of sports.</p>
+<p>After the data was stored in HDFS, we used Pivotal HAWQ and SQL to generate the necessary reports from the data stored in HDFS. Spring XD’s batch job capability was leveraged to execute the reports after a game was done. The batch jobs produced JSON reports and stored them in <a href="http://blog.pivotal.io/tag/redis" target="_blank" title="Redis">Redis</a>, providing immediate access to a web-based dashboard. Spring XD and Pivotal HD provided clustering and failover support to ensure business continuity in the event of a server failure.</p>
+<p>Spring XD turned out to be a perfect solution because it was designed with a distributed and extensible pipeline for ingesting data, processing it, performing real-time analytics on the received data, and then exporting it. Using Spring XD, we quickly implemented a system to receive the raw heartbeat data from the mobile applications. Spring XD provides several “sources” and “sinks” out of the box, and we were able to modify the existing HTTP source and HDFS sink to receive and store the raw heartbeat data. We also created a custom “processor” module that enabled us to filter and validate the raw data, ensuring that it was formatted as expected and had valid data in the expected JSON fields. Spring XD also provided a mechanism to “tap” data from one stream to another. Using a tap, it was simple for us to configure a stream to count the number of heartbeat packets received. This allowed us to ensure the system worked as expected—we could see the amount of live data going through the system in real-time. Since Spring XD supports a distributed runtime deployment, it also ensured that inbound data would continue to process in the event of any server failure.</p>
+<h2><strong>Creating Analytical Reports with Spring XD, HAWQ, Redis, and Spring Boot</strong></h2>
+<p>With HDFS storing the raw data, we used the <a href="http://blog.pivotal.io/pivotal/products/json-on-hadoop-example-for-extending-hawq-data-formats-using-pivotal-extension-framework-pxf" target="_blank" title="Pivotal Xtension Framework">Pivotal Xtension Framework</a> (PXF) and <a href="http://blog.pivotal.io/tag/hawq" target="_blank" title="HAWQ">HAWQ</a> to perform SQL queries directly against the JSON data. PXF maps the JSON to columns in a database, enabling HAWQ to execute SQL queries directly against the JSON data in HDFS. Using SQL, the product manager could then define the report queries.</p>
+<p>For the next step, we turned to Spring XD’s batch capabilities. Custom “jobs” were configured with the appropriate SQL queries to execute. The jobs are scheduled to execute early in the morning, after a game has occurred, and the report results are stored in Redis. Redis stores all the reports so that users can view any of them without needing to spend the time computing them on demand. Finally, we implemented a simple REST API, using <a href="http://blog.pivotal.io/tag/spring-boot" target="_blank" title="Spring Boot">Spring Boot</a>, to serve the JSON reports to the user interface.</p>
+<p>A web-based dashboard was also built and allows users to easily view the weekly reports as they are available. Here, Spring Boot was used with JavaScript libraries like <a href="https://angularjs.org/" target="_blank" title="Angular.js">Angular.js</a> and <a href="http://d3js.org/" target="_blank" title="D3.js">D3.js</a>. Spring Boot and Spring Security were used to quickly secure the dashboard by adding a login page and requiring HTTPS for access.</p>
+<p>Together, Spring XD, Pivotal HD and HAWQ, Redis, and Spring Boot were used to quickly create a big data solution for massive ingesting, analyzing, and reporting on cellular data use for live, game-day videos. Now, the client can identify trends and optimize media revenue.</p>
+<p><strong>Learn More:</strong></p>
+<ul>
+<li>Spring XD: <a href="http://projects.spring.io/spring-xd/" target="_blank" title="Project and Documentation">Project and Documentation</a> | <a href="http://blog.pivotal.io/tag/spring-xd" target="_blank" title="Blog Articles">Blog Articles</a> | <a href="http://blog.pivotal.io/pivotal/products/spring-xd-for-real-time-analytics" target="_blank" title="Using XD for Real Time Twitter">Using XD for Real Time Twitter</a></li>
+<li>Pivotal HD (SQL on HDFS via HAWQ): <a href="http://www.pivotal.io/big-data/pivotal-hd" target="_blank" title="Product">Product</a> | <a href="http://pivotalhd.docs.pivotal.io/doc/2010/index.html" target="_blank" title="Documentation">Documentation</a> | <a href="http://blog.pivotal.io/tag/pivotal-hd" target="_blank" title="Blog Articles">Blog Articles</a></li>
+<li>Redis: <a href="http://blog.pivotal.io/tag/redis/redis.io" target="_blank" title="Website">Website</a> | <a href="http://blog.pivotal.io/tag/redis" target="_blank" title="Blog Articles">Blog Articles</a></li>
+<li>Spring Boot: <a href="http://projects.spring.io/spring-boot/" target="_blank" title="Project and Documentation">Project and Documentation</a> | <a href="http://blog.pivotal.io/tag/spring-boot" target="_blank" title="Blog Articles">Blog Articles</a></li>
+<li>Pivotal Open Source: <a href="http://www.pivotal.io/oss" target="_blank" title="Products and Projects">Products and Projects</a> | <a href="http://blog.pivotal.io/tag/open-source" target="_blank" title="Blog Articles">Blog Articles</a></li>
+</ul>
+<p><em><strong>Editor’s Note</strong>: Apache, Apache Hadoop, Hadoop, and the yellow elephant logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</em></p></div>
+    </content>
+    <updated>2014-10-13T09:43:58Z</updated>
+    <category term="Case Studies"/>
+    <category term="big data"/>
+    <category term="case studies"/>
+    <category term="Hadoop"/>
+    <category term="HAWQ"/>
+    <category term="open source"/>
+    <category term="Pivotal HD"/>
+    <category term="Redis"/>
+    <category term="Spring"/>
+    <author>
+      <name>Allan Baril</name>
+    </author>
+    <source>
+      <id>http://blog.pivotal.io</id>
+      <link href="http://blog.pivotal.io/tag/redis/feed" rel="self" type="application/rss+xml"/>
+      <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
+      <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
+      <title>Pivotal P.O.V. » Redis</title>
+      <updated>2015-06-09T19:16:49Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en-US">
+    <id>http://blog.pivotal.io/?p=10829</id>
+    <link href="http://blog.pivotal.io/pivotal/news-2/apache-way-at-pivotal" rel="alternate" type="text/html"/>
+    <title>Apache Way at Pivotal</title>
+    <summary>Pivotal's Roman Shaposhnik describes his role as the resident Apache Software Foundation guy for Datafabrics, and his journey to make sure that Pivotal grows its pool of Apache Committers in the truest sense, and not one that fights over the existing pool. Today, Roman hits a milestone on this journey by announcing that Jun Aoki and his work with the Apache® Ambari project to help add features and help the project to become more stable by working on build and CI automation has led to the Apache® Ambari PMC to vote Jun in as a committer. This milestone in Jun's efforts underscore the work Shaposhnik has led at Pivotal to build an environment where open source contributions particularly to the ASF is one where, while we can't guarantee you will get a place in the ASF, but we can guarantee we will move heaven and earth to empower you to do so.</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p><img alt="featured-feathers" class="alignleft size-full wp-image-10839" height="200" src="http://blog.pivotal.io/wp-content/uploads/2014/10/featured-feathers.png" width="200"/>Ever since I joined Pivotal, one of my favorite topics of cocktail conversation has become explaining to folks unfamiliar with the company just how much of a <a href="http://blog.pivotal.io/pivotal/products/open-source-is-pivotal" target="_blank" title="Open Source is Pivotal">quintessential open source shop we are</a>. Just rattling off the names of the projects and communities we stand behind feels like listing ‘who’s who’ of open source. Being a betting man as I am, I typically introduce Pivotal by making a $1 bet that whoever I’m talking to is likely to have used software we contribute to at some point in their career. Given that this list includes <a href="http://www.pivotal.io/platform-as-a-service/pivotal-cf" target="_blank" title="Cloud Foundry">Cloud Foundry</a>, <a href="http://projects.spring.io/spring-framework/" target="_blank" title="Spring Framework">Spring Framework</a>, <a href="http://groovy.codehaus.org/" target="_blank" title="Groovy">Groovy</a>, <a href="https://grails.org/" target="_blank" title="Grails">Grails</a>, <a href="http://www.pivotal.io/big-data/redis" target="_blank" title="Redis">Redis</a>, <a href="http://www.pivotal.io/products/pivotal-rabbitmq" target="_blank" title="RabbitMQ">RabbitMQ</a>, <a href="http://tomcat.apache.org/" target="_blank" title="Tomcat">Tomcat</a> and most recently <a href="http://hadoop.apache.org" target="_blank" title="Apache Hadoop">Apache Hadoop®</a> the only folks I ever lose to are the poor souls still stuck on Windows 95 or mainframes. Paying $1 to them feels less like losing a bet, and more like a random act of kindness.</p>
+<p>As a side note, this incredible diversity of Pivotal’s open source portfolio helps our business model a great deal. After all, the days when one could have a sizable stand-alone business built around a single open source project are as distant as dial-up internet access. There’s a lot to be said on what a winning open-source strategy looks like (I may dare defining one in one of my future blog posts). Whatever it is, if you are an enterprise infrastructure vendor in 2014, you can’t survive without having one. The market has clearly spoken in favor of enterprise infrastructure products built around open source projects. With this came a realization that the only sustainable way of doing so was to build long-term relationships with open source communities. This, of course, meant that business now found themselves thinking deep and hard about open source community governance.</p>
+<p>It is perhaps ironic, that the single most important detail of how open source communities operate doesn’t get as much air time as licensing or patenting. Somehow there’s a perception that open source communities don’t even need much of governance. They are expected to self-organize into utopian worker collectives that could serve as a living illustration to “from each according to his ability, to each according to his need” principle. Nothing can be further from the truth. Each big, successful open source community is unique and typically very particular about the governance model. Open source communities, and by extension projects that they work on, live and die by how effective their governance model is. A great community can alway fix technology, a poor community is bound to ruin the best technology that is entrusted to it.</p>
+<p>Now, remember my earlier point about the sheer size of Pivotal’s open source portfolio? Community governance is where it starts to matter yet again. Because you see, regardless of how much a runaway success Spring is (and standing at 8+ million users nobody would argue it isn’t) the governance model that made it so successful is unique to it. It is true that Spring uses Apache License, but the similarities with the Apache Software Foundation (ASF) governance model ends there.</p>
+<p>ASF governance model, also known as “The Apache Way”, is a very unique, extremely well thought out approach to building successful open source communities. Communities that are capable of innovating on a diverse set of projects all living under the Foundation’s umbrella. “The Apache Way” has been covered in great details over the years, its elevator pitch fits in just three words: “Community over code”. No really, that is it—everything else is an implementation detail.</p>
+<p>It must be said, that even before I joined Pivotal, the company has had a relationship with the ASF. We have been a constant sponsor of the Foundation and with guys like Mark Thomas and Bill Rowe working for Spring side of Pivotal “The Apache Way” was practiced quite well when it comes to Apache Tomcat and Apache HTTPD. At the same time, the scale at which Datafabrics side of Pivotal has embraced ASF projects around Apache Hadoop® ecosystem required a different level of focus on ASF.</p>
+<p><a href="http://www.pivotal.io/careers"><img alt="cta-hiring" class="alignnone size-full wp-image-9320" height="135" src="http://blog.pivotal.io/wp-content/uploads/2014/06/cta-hiring.png" width="600"/></a></p>
+<p>So that was part of my mission when joining Pivotal: become a resident ASF guy for data technologies organization and <em>make sure that in a year’s time Pivotal becomes a company that grows the pool of Apache Committers, not a company that just fights over the existing pool.</em></p>
+<p>This project started with putting a framework in place that enables Pivotal engineers to collaborate on ASF software with minimum distraction (this required a close collaboration with our outstanding legal team). Our next step was to review our product roadmap and based on customer’s feedback start focusing on a project that they needed. This is what our <a href="http://blog.pivotal.io/pivotal/features/strengthening-hadoop-in-the-enterprise-with-apache-ambari" target="_blank" title="Strengthening Apache Hadoop in the Enterprise with Apache Ambari">previous announcement around Apache® Ambari</a> was all about.</p>
+<p>In the short couple of month we have not only contributed a <a href="https://issues.apache.org/jira/browse/AMBARI-7292" target="_blank" title="AMBARI-7292">wide</a> <a href="https://issues.apache.org/jira/browse/AMBARI-7551" target="_blank" title="AMBARI-7551">variety</a> of improvements to it, but also helped the project get more stable by working on<a href="https://builds.apache.org/view/All/job/Ambari-trunk-Commit/" target="_blank" title="Ambari-trunk-Commit"> build </a>and <a href="https://issues.apache.org/jira/browse/AMBARI-7209" target="_blank" title="AMBARI-7209">CI automation</a> and suggesting <a href="http://markmail.org/message/rs5j5j365txapalm" target="_blank" title="Proposal">process improvements</a> to innovate even quicker while not losing the sense of project stability. Pivotal’s product has benefited from this relationship, but so did Apache® Ambari: it has become better and more featureful, but most importantly its community has grown stronger and more diverse. In fact, recognizing all the hard work that one of Pivotal’s engineers Jun Aoki has put into the project, the Apache® Ambari PMC has <a href="http://markmail.org/message/dwfwtercyj3s6moq" target="_blank" title="Jun invited to Ambari">voted</a> Jun in as a committer.</p>
+<p>This may be a small step for Jun (and, to be sure, the first one in many other ASF projects that he is going to join), but it actually signifies a giant leap for Pivotal and the kind of role it is assuming in ASF from now on. We’re already delivering on that fundamental vision of making sure that our engineers get fully empowered to lead most impactful open source projects within the Foundation. If you are an engineer dreaming to add the coveted Committer/PMC of Apache X to your resume, join us. We can’t guarantee that you will get that line (after all, ASF recognizes your personal merit and your personal merit alone) but we can guarantee that we will move heaven and earth to empower you to do so.</p>
+<p>After all a stronger Apache Software Foundation (ASF) will benefit the entire industry. It is, you see, that proverbial tide that lifts all boats big and small.</p>
+<p><em><strong>Editor’s Note</strong>: Apache, Apache Hadoop, Hadoop, and the yellow elephant logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</em></p></div>
+    </content>
+    <updated>2014-10-08T16:27:06Z</updated>
+    <category term="News"/>
+    <category term="Ambari"/>
+    <category term="Apache httpd"/>
+    <category term="Apache Software Foundation"/>
+    <category term="Apache Tomcat"/>
+    <category term="Grails"/>
+    <category term="Groovy"/>
+    <category term="Hadoop"/>
+    <category term="open source"/>
+    <category term="RabbitMQ"/>
+    <category term="Redis"/>
+    <category term="Spring"/>
+    <author>
+      <name>Roman Shaposhnik</name>
+    </author>
+    <source>
+      <id>http://blog.pivotal.io</id>
+      <link href="http://blog.pivotal.io/tag/redis/feed" rel="self" type="application/rss+xml"/>
+      <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
+      <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
+      <title>Pivotal P.O.V. » Redis</title>
+      <updated>2015-06-09T19:16:49Z</updated>
+    </source>
+  </entry>
+
+  <entry xml:lang="en-US">
+    <id>http://blog.pivotal.io/?p=10510</id>
+    <link href="http://blog.pivotal.io/pivotal-cloud-foundry/news-2/an-introduction-to-the-pivotal-cf-mobile-suite-api-gateway" rel="alternate" type="text/html"/>
+    <title>An Introduction to the Pivotal CF Mobile Suite API Gateway</title>
+    <summary>The API Gateway is one of the products available on the Pivotal CF Mobile Services. It allows developers to easily create edge gateways proxy calls between devices and your organization internal services. One of the benefits of using an edge gateway is that you can perform all of the above without having to modify internal services. In this post, we will show how easy is to implement a rate limiting edge gateway service using Pivotal’s API Gateway and Redis.</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p><img alt="featured-PCF-mobile" class="alignleft size-full wp-image-10327" height="200" src="http://blog.pivotal.io/wp-content/uploads/2014/08/featured-PCF-mobile.png" width="200"/>The API Gateway is one of the products available on the Pivotal CF Mobile Services. It allows developers to easily create edge gateways proxy calls between devices and your organization internal services.</p>
+<p>There are several reasons why one would consider having such services in place:</p>
+<ul>
+<li><strong>Centralized authentication</strong>: Your internal services may have different authentication mechanisms, if any, and you may want to expose a API key style of authentication to external consumers.</li>
+<li><strong>Reduce chattiness</strong>: Allows mobile devices to reduce the number of calls to your backend by aggregating invocations to multiple services at once.</li>
+<li><strong>Data type conversion</strong>: Internal services may have different formats such as REST or SOAP, an edge gateway can serve as a central transformation point.</li>
+<li><strong>Data filtering</strong>: You can filter data either based on role based access or perhaps just for the sake of saving bandwidth to certain clients.</li>
+<li><strong>Rate limiting</strong>: Control the number of requests clients can make to your services. This can avoid possible DDOS on your services as well as control access to certain billable services such as third-party services you may use.</li>
+</ul>
+<p>One of the benefits of using an edge gateway is that you can perform all of the above without having to modify internal services—the gateway will sit between your services and the clients. The picture below demonstrates this:</p>
+<p><img alt="Screen Shot 2014-09-24 at 11.05.48 AM" class="aligncenter size-full wp-image-10604" height="1094" src="http://blog.pivotal.io/wp-content/uploads/2014/09/Screen-Shot-2014-09-24-at-11.05.48-AM.png" width="1244"/></p>
+<p>Pivotal’s API Gateway uses javascript as its core language, but not your usual javascript engine. It’s powered by Nashorn, the latest JDK script engine. This approach allows developers to enjoy the benefits of using a simple script language such as javascript, while still being able to seamless integrate with Spring beans. You can invoke any Java Spring bean from your javascript code.</p>
+<p>The picture below depicts the internals of a gateway application. Note that you can add your own java beans as well as javascript code.</p>
+<p><img alt="Screen Shot 2014-09-24 at 11.05.58 AM" class="aligncenter size-full wp-image-10605" height="876" src="http://blog.pivotal.io/wp-content/uploads/2014/09/Screen-Shot-2014-09-24-at-11.05.58-AM.png" width="1092"/></p>
+<h2>Implementing Rate Limit</h2>
+<p>In this post, we will show how easy is to implement a rate limiting edge gateway service using Pivotal’s API Gateway and Redis.</p>
+<p>Rate limiting is an important feature that you should consider when exposing your APIs to external users. It prevents possible DDOS on your internal services by discarding requests from customers which exceeded the maximum stipulated quota. It also allows you to have control of your billing expenses on your IaaS provider by controlling traffic and usage.</p>
+<p>When it comes to rate limiting there isn’t a standard on how to deal with it, but several service providers such as <a href="https://dev.twitter.com/rest/public/rate-limiting">twitter</a> and <a href="https://developer.github.com/v3/rate_limit/" title="GitHub">github</a> utilizes a combination of HTTP response headers and an HTTP Response code 429 (too many requests) when the client quota has exceeded.</p>
+<p>There are many ways of implementing rate limiting, but in a nutshell we need to be able to:</p>
+<ol>
+<li>Identify the caller (via an API key or IP address)</li>
+<li>Log the number of requests</li>
+<li>Set an expiration time for the request window (1 minute, 1 hour, 1 day)</li>
+</ol>
+<h2>Rate control using Redis</h2>
+<p>Redis is a great choice for implementing rate limiting. It offers the capability of setting keys timeouts as well as atomic increase operations on a numeric key.</p>
+<p>The pattern is actually described on the <a href="http://redis.io/commands/INCR">redis incr command</a>. We will use a slight variation of that, which allows us to control the window interval as opposed to only using a one second window.</p>
+<p>Redis stores one value with a JSON configuration object for each API key in this way:</p>
+<p>{<br/>
+“key”:”mykey”,<br/>
+“value”:10,<br/>
+“current”:null,<br/>
+“reset”:null,<br/>
+“window”:60<br/>
+}</p>
+<p><strong>key</strong>: The API Key associated with this config<br/>
+<strong>value</strong>: The request limit<br/>
+<strong>current</strong>: The current request count for a given period (not used on configuration)<br/>
+<strong>reset</strong>: The Unix epoch in milliseconds of the next reset of the count<br/>
+<strong>window</strong>: Controls how long the counter will be held in memory</p>
+<p>The above configuration creates a rate limit control that allows 10 requests per minute. Using Spring-Data-Redis, all we need is one Bean to get the information for each API request.</p>
+<p>The code below shows the java spring bean we created to keep track of requests per api:</p>
+<pre class="brush: plain; title: ; notranslate">package io.pivotal.api.rate;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+@Component("rateLimiter")
+public class RateLimiterImpl {
+
+	@Autowired
+	private StringRedisTemplate template;
+
+	@Autowired
+	private ObjectMapper mapper;
+
+	/**
+	 *  Reads the current value of a given key on a window of time. It contains both the value and next reset window
+	 *  This entry is stored in redis as a key on the format : 'apikey:timewindow'
+	 *
+	 * */
+
+	public Rate getCurrent(final Rate rate){
+		Long now = System.currentTimeMillis();
+		Long time = (Long)(now/(1000*rate.getWindow()));
+		final String key = rate.getKey()+":"+time;
+		List&lt;Object&gt; results = template.execute(new SessionCallback&lt;List&lt;Object&gt;&gt;() {
+
+			@Override
+			public  List&lt;Object&gt; execute(RedisOperations ops) throws DataAccessException {
+				ops.multi();
+				ops.boundValueOps(key).increment(1L);
+				ops.expire(key, rate.getWindow(), TimeUnit.SECONDS);
+				return ops.exec();
+			}
+		});
+		Long current = (Long)results.get(0);
+		rate.setCurrent(current.intValue());
+		rate.setReset(time*(rate.getWindow()*1000));
+		return rate;
+	}
+	/**
+	 * Fetches the configured rate for a given API. This entry only contains the key, the window and value
+	 * it does not store the value of the current invocation or the next reset window.
+	 * This entry is represented in redis just by the key 'apikey'
+	 *
+	 * */
+
+	public Rate getRate(String apikey){
+		Rate rate = null;
+		try {
+			rate = mapper.readValue(template.opsForValue().get(apikey), Rate.class);
+			rate = getCurrent(rate);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return rate;
+	}
+
+	public void setRate(Rate rate){
+		try {
+			template.opsForValue().set(rate.getKey(), mapper.writeValueAsString(rate));
+		} catch (JsonProcessingException e) {
+			e.printStackTrace();
+		}
+	}
+}
+</pre>
+<p>For sake of simplicity, we use the same JSON object to represent the configuration for a given API—for example, the number of requests and the window duration—as well as the current value for that instance in time.</p>
+<p>We use two separate keys to store this. For the configuration, it’s a key that has not ttl and its stored using the apikey as the key. For the current value, we store using apikey:window as the key and we set a TTL on it.</p>
+<p>For each call we create an unique key composed of the API key plus the current time divided by the rate window. This will give an unique key for each window of invocation. On each call we increment the key and increase its time to live by the rate window.</p>
+<p>When the time window expires we generate a new key with a zero counter, the old key would still live for as long as the length of the window, but since it would never be refreshed, Redis will eventually expire it.</p>
+<h2>Javascript meets Java</h2>
+<p>As mentioned before, one of the greatests features of API Gateway is the ability to mesh Javascript code with Java. Writing your application in Javascript will allow you to leverage the simplicity of the language, and its great support for JSON. This reduces quite significantly the amount of boilerplate that would be needed to write APIs, while allowing you to access your java backend components as first class citizens.</p>
+<p>API Gateway has a native spring global function that allows you to invoke any spring bean that is part of your application. Using this feature we can easily access our RateLimiter service bean.</p>
+<p>To enable the rate limit for any request to this API endpoint we’ve created a decorator around the original Router that checks for the limits of each request:</p>
+<pre class="brush: plain; title: ; notranslate">var RatedRouter = function(router) {
+	this.router = router;
+}
+
+function getApiKey(req){
+	var header = req.headers["Authorization"];
+	return header.split(" ")[1];
+}
+
+function checkLimit(req,res){
+	var api = getApiKey(req);
+	var rate = spring.getBean("rateLimiter").getRate(api);
+	var remaining = rate.value-rate.current;
+	console.log(JSON.stringify(rate));
+	res.setHeader("X-RateLimit-Limit",rate.value);
+	res.setHeader("X-RateLimit-Remaining", remaining);
+	res.setHeader("X-RateLimit-Reset",rate.reset);
+	return (remaining &gt; 0);
+}
+
+RatedRouter.prototype = {
+
+	get: function(path, handle){
+		this.router.get(path, function(req, res){
+			if(!checkLimit(req,res)){
+				res.setStatus(429);
+			}else{
+				handle(req,res);
+			}
+		});
+	},
+	post: function(path, handle){
+		this.router.post(path, function(req, res){
+			if(!checkLimit(req,res)){
+				res.setStatus(429);
+			}else{
+				handle(req,res);
+			}
+		});
+	},
+
+	put: function(path, handle){
+		this.router.put(path, function(req, res){
+			if(!checkLimit(req,res)){
+				res.setStatus(429);
+			}else{
+				handle(req,res);
+			}
+		});
+	},
+
+	delete : function(path, handle){
+		this.router.delete(path, function(req, res){
+			if(!checkLimit(req,res)){
+				res.setStatus(429);
+			}else{
+				handle(req,res);
+			}
+		});
+	}
+
+}
+
+module.exports = RatedRouter
+</pre>
+<p>The checkLimit function will retrieve the limits for this request, and add the proper X-Rate-Limit headers to each response.</p>
+<p>Each method on this router will check if the limit was reached and return a 429 (Too Many Requests) empty response if true, or just invoke the original handler that was passed to it (with the enhanced headers).</p>
+<p>To demonstrate this new rate limited router, we will modify the http client sample (<a href="https://github.com/cfmobile/api-gateway-samples/tree/master/sample-http" target="_blank">see here</a>) and make sure that the calls to the external endpoint now have rate limiting enabled.</p>
+<pre class="brush: plain; title: ; notranslate">var Router = require("Router");
+var RatedRouter = require("modules/RatedRouter")
+var _router = new Router();
+var appRouter = new RatedRouter(_router);
+
+var fbGraphClient = require('http')({
+	baseUrl : 'http://graph.facebook.com/',
+});
+
+appRouter.get("/fb/pivotal", function(req, res) {
+	var result = fbGraphClient.getJSON('pivotalsoftware', function(response) {
+		return {
+			reponse_code_from_fb : response.statusCode,
+			data_from_fb : response.body
+		};
+	});
+	res.setBody(result);
+});
+
+module.exports = _router;
+</pre>
+<p>The new script is exact the same as the one on the samples, but now calls respect a limit that is stored on your redis database.</p>
+<p>To test it out, let’s create a script that tries to invoke this endpoint 11 times in windows of less than 60 seconds.</p>
+<pre class="brush: plain; title: ; notranslate">for i in {1..11}; do curl -i -H "Authorization: apikey mykey" http://localhost:8080/api/v1/fb/pivotal;  done
+
+HTTP/1.1 200 OK
+X-Application-Context: application:9999
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+X-RateLimit-Reset: 1410442320000
+Content-Type: application/json;charset=UTF-8
+Transfer-Encoding: chunked
+Server: Jetty(8.1.15.v20140411)
+
+{hidden response body}
+
+HTTP/1.1 200 OK
+X-Application-Context: application:9999
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+X-RateLimit-Reset: 1410442320000
+Content-Type: application/json;charset=UTF-8
+Transfer-Encoding: chunked
+Server: Jetty(8.1.15.v20140411)
+.
+.
+.
+HTTP/1.1 429 429
+X-Application-Context: application:9999
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1410442320000
+Content-Type: application/json;charset=UTF-8
+Transfer-Encoding: chunked
+Server: Jetty(8.1.15.v20140411)
+</pre>
+<p>As you can see after the 10th call the server stops forwarding requests to the fbClient service and returns 429. The client receives a X-RateLimit-Reset header that informs when it would be ok to call the service again.</p>
+<h2>Summary</h2>
+<p>This post was intended to demonstrate how easy it is to add features to your edge gateway when using Pivotal’s API Gateway. With very few lines of code we were able to enable rate limiting to our internal services without having to change any existing component.</p>
+<p>The seamless integration between javascript and java puts the best of both languages at your disposal. You can still rely on enterprise grade components built using Spring Framework, while leveraging a dynamic scripting language running on an asynchronous framework that the API Gateway provides.</p></div>
+    </content>
+    <updated>2014-09-24T16:31:58Z</updated>
+    <category term="News"/>
+    <category term="Products"/>
+    <category term="Mobile Suite API Gateway"/>
+    <category term="Pivotal Cloud Foundry"/>
+    <category term="Redis"/>
+    <author>
+      <name>Vinicius Carvalho</name>
+    </author>
+    <source>
+      <id>http://blog.pivotal.io</id>
+      <link href="http://blog.pivotal.io/tag/redis/feed" rel="self" type="application/rss+xml"/>
+      <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
+      <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
+      <title>Pivotal P.O.V. » Redis</title>
+      <updated>2015-06-09T19:16:49Z</updated>
+    </source>
+  </entry>
+</feed>

@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <opml version="1.1">
-	<head>
-		<title>Community Redis Aggregator</title>
-		<dateModified>Mon, 08 Jun 2015 16:00:32 +0000</dateModified>
-		<ownerName>Baron Schwartz</ownerName>
-		<ownerEmail>baron.schwartz@gmail.com</ownerEmail>
-	</head>
-	
-	<body>
-		<outline type="rss" text="Antirez" xmlUrl="http://antirez.com/rss" title="Antirez weblog" />
-		<outline type="rss" text="Pivotal" xmlUrl="http://blog.pivotal.io/tag/redis/feed" title="Pivotal P.O.V. » Redis" />
-		<outline type="rss" text="Redis Labs" xmlUrl="https://redislabs.com/feed" title="Redis Labs" />
-	</body>
+  <head>
+    <title>Community Redis Aggregator</title>
+    <dateModified>Tue, 09 Jun 2015 19:16:54 GMT</dateModified>
+    <ownerName>Baron Schwartz</ownerName>
+    <ownerEmail>baron.schwartz@gmail.com</ownerEmail>
+  </head>
+  <body>
+    <outline type="rss" text="Antirez" title="Antirez weblog" xmlUrl="http://antirez.com/rss"/>
+    <outline type="rss" text="Pivotal" title="Pivotal P.O.V. &#xBB; Redis" xmlUrl="http://blog.pivotal.io/tag/redis/feed"/>
+    <outline type="rss" text="Redis Labs" title="Redis Labs" xmlUrl="http://redislabs.com/feed"/>
+    <outline type="rss" text="Vivid Cortex" title="VividCortex" xmlUrl="https://vividcortex.com/index.xml"/>
+  </body>
 </opml>
