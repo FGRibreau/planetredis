@@ -34,7 +34,7 @@
 #header #orangeHeader
 {
 	height: 72px;
-	background: url('/images/leaves.jpg') repeat-x top left;
+	background: url('../images/leaves.jpg') repeat-x top left;
 }
 
 #header #orangeHeader h1
@@ -170,7 +170,7 @@
 .widgetcontainer .widgettitle
 {
 	padding: 10px 8px;
-	background: url("/images/sidebox_stripes.png");
+	background: url("../images/sidebox_stripes.png");
 	-moz-border-top-left-radius: 4px;
 	-webkit-border-top-left-radius: 4px;
 	-moz-border-top-right-radius: 4px;
