@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:planet="http://planet.intertwingly.net/" xmlns:indexing="urn:atom-extension:indexing" indexing:index="no"><access:restriction xmlns:access="http://www.bloglines.com/about/specs/fac-1.0" relationship="deny"/>
   <title>Community Redis Aggregator</title>
-  <updated>2015-06-09T19:17:43Z</updated>
+  <updated>2015-06-09T19:39:19Z</updated>
   <generator uri="http://intertwingly.net/code/venus/">Venus</generator>
   <author>
     <name>Baron Schwartz</name>
@@ -35,7 +35,7 @@
       <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
       <subtitle>Recent content on VividCortex</subtitle>
       <title>VividCortex</title>
-      <updated>2015-06-09T19:17:43Z</updated>
+      <updated>2015-06-09T19:39:19Z</updated>
     </source>
   </entry>
 
@@ -222,7 +222,7 @@
 <br/>Thanks for the very useful feedbacks.
 <a href="http://antirez.com/news/77">Comments</a></div>
     </summary>
-    <updated>2015-06-09T15:19:31Z</updated>
+    <updated>2015-06-09T19:33:49Z</updated>
     <source>
       <id>http://antirez.com</id>
       <author>
@@ -232,7 +232,7 @@
       <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
       <subtitle>Description pending</subtitle>
       <title>Antirez weblog</title>
-      <updated>2015-06-09T19:17:40Z</updated>
+      <updated>2015-06-09T19:39:15Z</updated>
     </source>
   </entry>
 
@@ -297,7 +297,7 @@
 <br/>EDIT: Actually I was not right and the malloc implementation inside the Glibc is BSD licensed, so it is not a license issue. I don't know why the Glibc is not using Jemalloc instead that is very good and actively developed allocator.
 <a href="http://antirez.com/news/76">Comments</a></div>
     </summary>
-    <updated>2015-06-09T15:19:31Z</updated>
+    <updated>2015-06-09T19:33:49Z</updated>
     <source>
       <id>http://antirez.com</id>
       <author>
@@ -307,7 +307,7 @@
       <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
       <subtitle>Description pending</subtitle>
       <title>Antirez weblog</title>
-      <updated>2015-06-09T19:17:40Z</updated>
+      <updated>2015-06-09T19:39:15Z</updated>
     </source>
   </entry>
 
@@ -473,7 +473,7 @@
 <br/>The HN post is here: https://news.ycombinator.com/item?id=7506774
 <a href="http://antirez.com/news/75">Comments</a></div>
     </summary>
-    <updated>2015-06-09T15:19:31Z</updated>
+    <updated>2015-06-09T19:33:49Z</updated>
     <source>
       <id>http://antirez.com</id>
       <author>
@@ -483,7 +483,7 @@
       <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
       <subtitle>Description pending</subtitle>
       <title>Antirez weblog</title>
-      <updated>2015-06-09T19:17:40Z</updated>
+      <updated>2015-06-09T19:39:15Z</updated>
     </source>
   </entry>
 
@@ -506,7 +506,7 @@
 <br/>Today’s software is in some way the triumph of the other reality of software: layers of complexities that gave use incredible devices or infrastructure technologies that in the hands of non experts leverage a number of possibilities. However maybe there is still something to preserve from the ancient times where software could be perfect, the feeling that what you are creating has a structure and is not just a pile of code that works. If you zoom out enough, you’ll see your large program is actually quite small again, and at least at this scale, it should resemble perfection, or at least, aim at it.
 <a href="http://antirez.com/news/74">Comments</a></div>
     </summary>
-    <updated>2015-06-09T15:19:31Z</updated>
+    <updated>2015-06-09T19:33:49Z</updated>
     <source>
       <id>http://antirez.com</id>
       <author>
@@ -516,7 +516,7 @@
       <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
       <subtitle>Description pending</subtitle>
       <title>Antirez weblog</title>
-      <updated>2015-06-09T19:17:40Z</updated>
+      <updated>2015-06-09T19:39:15Z</updated>
     </source>
   </entry>
 
@@ -568,7 +568,7 @@
 <br/>Thanks to Yiftach Shoolman for feedbacks about this topic.
 <a href="http://antirez.com/news/73">Comments</a></div>
     </summary>
-    <updated>2015-06-09T15:19:31Z</updated>
+    <updated>2015-06-09T19:33:49Z</updated>
     <source>
       <id>http://antirez.com</id>
       <author>
@@ -578,7 +578,7 @@
       <link href="http://antirez.com/rss" rel="self" type="application/rss+xml"/>
       <subtitle>Description pending</subtitle>
       <title>Antirez weblog</title>
-      <updated>2015-06-09T19:17:40Z</updated>
+      <updated>2015-06-09T19:39:15Z</updated>
     </source>
   </entry>
 
@@ -622,7 +622,7 @@
       <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
       <link href="https://redislabs.com" rel="alternate" type="text/html"/>
       <title>Redis Labs</title>
-      <updated>2015-06-09T19:16:52Z</updated>
+      <updated>2015-06-09T19:33:56Z</updated>
     </source>
   </entry>
 
@@ -691,7 +691,7 @@ wire and feed it into analysis tools.</p></div>
       <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
       <subtitle>Recent content on VividCortex</subtitle>
       <title>VividCortex</title>
-      <updated>2015-06-09T19:17:43Z</updated>
+      <updated>2015-06-09T19:39:19Z</updated>
     </source>
   </entry>
 
@@ -713,7 +713,7 @@ wire and feed it into analysis tools.</p></div>
       <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
       <subtitle>Recent content on VividCortex</subtitle>
       <title>VividCortex</title>
-      <updated>2015-06-09T19:17:43Z</updated>
+      <updated>2015-06-09T19:39:19Z</updated>
     </source>
   </entry>
 
@@ -735,7 +735,7 @@ wire and feed it into analysis tools.</p></div>
       <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
       <subtitle>Recent content on VividCortex</subtitle>
       <title>VividCortex</title>
-      <updated>2015-06-09T19:17:43Z</updated>
+      <updated>2015-06-09T19:39:19Z</updated>
     </source>
   </entry>
 
@@ -806,7 +806,7 @@ wire and feed it into analysis tools.</p></div>
       <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
       <link href="https://redislabs.com" rel="alternate" type="text/html"/>
       <title>Redis Labs</title>
-      <updated>2015-06-09T19:16:52Z</updated>
+      <updated>2015-06-09T19:33:56Z</updated>
     </source>
   </entry>
 
@@ -850,7 +850,7 @@ for analyzing the following network protocols:
       <link href="https://vividcortex.com/index.xml" rel="self" type="application/rss+xml"/>
       <subtitle>Recent content on VividCortex</subtitle>
       <title>VividCortex</title>
-      <updated>2015-06-09T19:17:43Z</updated>
+      <updated>2015-06-09T19:39:19Z</updated>
     </source>
   </entry>
 
@@ -889,7 +889,7 @@ for analyzing the following network protocols:
       <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
       <link href="https://redislabs.com" rel="alternate" type="text/html"/>
       <title>Redis Labs</title>
-      <updated>2015-06-09T19:16:53Z</updated>
+      <updated>2015-06-09T19:33:56Z</updated>
     </source>
   </entry>
 
@@ -932,7 +932,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
       <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
       <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
       <title>Pivotal P.O.V. » Redis</title>
-      <updated>2015-06-09T19:16:49Z</updated>
+      <updated>2015-06-09T19:33:53Z</updated>
     </source>
   </entry>
 
@@ -1007,7 +1007,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
       <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
       <link href="https://redislabs.com" rel="alternate" type="text/html"/>
       <title>Redis Labs</title>
-      <updated>2015-06-09T19:16:52Z</updated>
+      <updated>2015-06-09T19:33:56Z</updated>
     </source>
   </entry>
 
@@ -1042,7 +1042,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
       <link href="http://redislabs.com/feed" rel="self" type="application/rss+xml"/>
       <link href="https://redislabs.com" rel="alternate" type="text/html"/>
       <title>Redis Labs</title>
-      <updated>2015-06-09T19:16:52Z</updated>
+      <updated>2015-06-09T19:33:56Z</updated>
     </source>
   </entry>
 
@@ -1092,7 +1092,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
       <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
       <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
       <title>Pivotal P.O.V. » Redis</title>
-      <updated>2015-06-09T19:16:49Z</updated>
+      <updated>2015-06-09T19:33:53Z</updated>
     </source>
   </entry>
 
@@ -1146,7 +1146,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
       <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
       <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
       <title>Pivotal P.O.V. » Redis</title>
-      <updated>2015-06-09T19:16:49Z</updated>
+      <updated>2015-06-09T19:33:53Z</updated>
     </source>
   </entry>
 
@@ -1191,7 +1191,7 @@ This hands-on course provides a broad overview of the Redis NoOSQL datastore, st
       <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
       <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
       <title>Pivotal P.O.V. » Redis</title>
-      <updated>2015-06-09T19:16:49Z</updated>
+      <updated>2015-06-09T19:33:53Z</updated>
     </source>
   </entry>
 
@@ -1471,7 +1471,7 @@ Server: Jetty(8.1.15.v20140411)
       <link href="http://blog.pivotal.io" rel="alternate" type="text/html"/>
       <subtitle>The Pivotal blog explores how people are harnessing sophisticated data fabrics and the cloud to build applications that achieve extraordinary things.</subtitle>
       <title>Pivotal P.O.V. » Redis</title>
-      <updated>2015-06-09T19:16:49Z</updated>
+      <updated>2015-06-09T19:33:53Z</updated>
     </source>
   </entry>
 </feed>

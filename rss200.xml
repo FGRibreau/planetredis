@@ -204,7 +204,7 @@
 &lt;br /&gt;
 &lt;br /&gt;Thanks for the very useful feedbacks.
 &lt;a href=&quot;http://antirez.com/news/77&quot;&gt;Comments&lt;/a&gt;</description>
-	<pubDate>Tue, 09 Jun 2015 15:19:31 +0000</pubDate>
+	<pubDate>Tue, 09 Jun 2015 19:33:49 +0000</pubDate>
 </item>
 <item>
 	<title>Antirez: Using Heartbleed as a starting point</title>
@@ -266,7 +266,7 @@
 &lt;br /&gt;
 &lt;br /&gt;EDIT: Actually I was not right and the malloc implementation inside the Glibc is BSD licensed, so it is not a license issue. I don't know why the Glibc is not using Jemalloc instead that is very good and actively developed allocator.
 &lt;a href=&quot;http://antirez.com/news/76&quot;&gt;Comments&lt;/a&gt;</description>
-	<pubDate>Tue, 09 Jun 2015 15:19:31 +0000</pubDate>
+	<pubDate>Tue, 09 Jun 2015 19:33:49 +0000</pubDate>
 </item>
 <item>
 	<title>Antirez: Redis new data structure: the HyperLogLog</title>
@@ -429,7 +429,7 @@
 &lt;br /&gt;
 &lt;br /&gt;The HN post is here: https://news.ycombinator.com/item?id=7506774
 &lt;a href=&quot;http://antirez.com/news/75&quot;&gt;Comments&lt;/a&gt;</description>
-	<pubDate>Tue, 09 Jun 2015 15:19:31 +0000</pubDate>
+	<pubDate>Tue, 09 Jun 2015 19:33:49 +0000</pubDate>
 </item>
 <item>
 	<title>Antirez: Fascinating little programs</title>
@@ -449,7 +449,7 @@
 &lt;br /&gt;
 &lt;br /&gt;Today’s software is in some way the triumph of the other reality of software: layers of complexities that gave use incredible devices or infrastructure technologies that in the hands of non experts leverage a number of possibilities. However maybe there is still something to preserve from the ancient times where software could be perfect, the feeling that what you are creating has a structure and is not just a pile of code that works. If you zoom out enough, you’ll see your large program is actually quite small again, and at least at this scale, it should resemble perfection, or at least, aim at it.
 &lt;a href=&quot;http://antirez.com/news/74&quot;&gt;Comments&lt;/a&gt;</description>
-	<pubDate>Tue, 09 Jun 2015 15:19:31 +0000</pubDate>
+	<pubDate>Tue, 09 Jun 2015 19:33:49 +0000</pubDate>
 </item>
 <item>
 	<title>Antirez: What is performance?</title>
@@ -498,7 +498,7 @@
 &lt;br /&gt;
 &lt;br /&gt;Thanks to Yiftach Shoolman for feedbacks about this topic.
 &lt;a href=&quot;http://antirez.com/news/73&quot;&gt;Comments&lt;/a&gt;</description>
-	<pubDate>Tue, 09 Jun 2015 15:19:31 +0000</pubDate>
+	<pubDate>Tue, 09 Jun 2015 19:33:49 +0000</pubDate>
 </item>
 <item>
 	<title>Redis Labs: CVE-2015-4335/DSA-3279 – Redis Lua Sandbox Escape</title>
