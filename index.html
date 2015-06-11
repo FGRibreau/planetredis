@@ -142,257 +142,303 @@
 		</div>
 	</div><!-- .post -->
 
-		<h3 id="todaysDate">April 16, 2015</h3>
+		<h3 id="todaysDate">June 04, 2015</h3>
 
 	<div class="hentry post">
 		<div class="postHeader">
 	<img class="face" src="images/nobody.png" alt="">
 
-			<h2 class="entry-title"><a href="https://redislabs.com/blog/redis-ram-ramifications-i" title="Redis Labs">Redis RAM Ramifications – Part I</a></h2>
+			<h2 class="entry-title"><a href="https://redislabs.com/blog/nosql-performance-aerospike-cassandra-datastax-couchbase-redis" title="Redis Labs">Rising NoSQL Star: Aerospike, Cassandra, Couchbase or Redis?</a></h2>
 
 <h3>Redis Labs</h3>
 
 			<div class="clearBoth"></div>
 		</div>
 		<div class="entry-content">
-<p><img alt="" class="alignnone size-full wp-image-9316" height="200" src="https://redislabs.com/wp-content/uploads/2015/04/2015-04-16.jpg" title="A Poor Man Pegasus: An African swallow carrying a coconut" width="635" /></p>
+<p><img alt="" class="aligncenter size-full wp-image-9953" height="200" src="https://redislabs.com/wp-content/uploads/2015/06/2015-06-04.png" title="Rising NoSQL Star: Redis outshines the competition, leaves 2nd places for Aerospike, Cassandra and Couchbase" width="635" /> </p>
 
 <blockquote>
-	<p style="text-align: right;">"…as we know, there are known knowns; there are things we know we know. We also know there are known unknowns; that is to say we know there are some things we do not know. But there are also unknown unknowns – the ones we don't know we don't know."</p>
-
-	<p style="text-align: right;">United States Secretary of Defense Donald Rumsfeld, 2002</p>
+	<p dir="ltr">"I always knew I was a star, and now the rest of the world seems to agree with me." — Freddie Mercury</p>
 </blockquote>
 
-<h3 dir="ltr">How much RAM does Redis need?</h3>
+<p>A new NoSQL benchmark was just released by <a href="http://www.avalonconsult.com/" target="_blank">Avalon Consulting, LLC</a>, and I couldn’t be happier to brag that Redis out-performed its competitors by a landslide. With more than double the throughput and half the latency of other NoSQL databases, our Redis Labs Enterprise Cluster dominated in a real-world application scenario. The Avalon benchmark report is <a href="http://redislabs.com/cbc-2015-15-nosql-benchmark" target="_blank">freely available here</a> and the results speak for themselves.</p>
 
-<p dir="ltr">If there's one most often repeated Redis question, it's this one. It's also one of the hardest to answer accurately because the answer depends on oh-so-many factors. In this post (and most likely a few upcoming ones as I do tend to ramble while I rumble and mumble), I'll try mapping out Redis' RAM consumption. While I can't guarantee an ultimate answer to everything, I hope it'll help to:</p>
+<p><a href="https://redislabs.com/cbc-2015-15-nosql-benchmark" target="_blank"><img class="aligncenter size-full" src="https://redislabs.com/wp-content/images/lp/2015-q2/graph.png" title="Rising NoSQL Star: Redis outshines the competition, leaves 2nd places for Aerospike, Cassandra and Couchbase" /></a></p>
 
-<ul>
-	<li dir="ltr">Repeat what we know about the known knowns (<em>KK</em>s)</li>
-	<li dir="ltr">Turn known unknowns (<em>KU</em>s) into KKs when possible, or at least into known roughly-understood unknowns (<em>KRUU</em>s)</li>
-	<li dir="ltr">Hopefully stumble on some unknown unknowns (<em>UU</em>s), and turn them into KUs, KRUUs or even KKs!</li>
-</ul>
+<p>But before we get into all the fun background on this particular test, let’s acknowledge a few things about benchmarks. There's no way around it - performing meaningful comparisons between NoSQL solutions is a hard task. That is because of benchmarking's "original sin" — results from any benchmark are truly relevant only to the specific application that was used for the test (see <a href="https://gist.github.com/itamarhaber/2dad94e3bdd2980bce73" target="_blank">Haber's Benchmarking Theorem</a>). This fact is compounded by the diverse capabilities of all the different NoSQL databases. Typical benchmark models tend to generalize a specific use case, and in the process they distance themselves from the underlying data management system and fail to leverage its strengths.</p>
 
-<p dir="ltr"><em><strong>Side note:</strong> you can track my progress on this series by subscribing to the <a href="https://redislabs.com/blog/feed" target="_blank">RSS feed</a>. Alternatively, sign up to <a href="https://redislabs.com/redis-watch-archive" target="_blank">Redis Watch</a> and get weekly updates delivered to your inbox. Lastly, but only if you're up to it, <a href="https://twitter.com/redislabsinc" target="_blank">follow us</a> on Twitter for real-time action.</em></p>
+<p dir="ltr">This by itself is hardly news and the past is riddled with attempts at <a href="https://redislabs.com/blog/nosql-bar-datastax-aerospike-couchbase-redis-google-cloud-platform" target="_blank">comparing apples to oranges</a>. I gave an entire presentation at RedisConf 20Fifteen on this subject ( <a href="https://www.youtube.com/watch?v=aotCPUtahDU" target="_blank">"Benchmarking Redis By Itself and Versus Other NoSQL Databases"</a>). If you've watched it then you already know I believe that the only way to compare apples with oranges is through an applicative benchmark, in which the test application is optimized independently for each DBMS. That RedisConf talk, it turns out, was only the warm-up act for a session by Lahav Savir, CEO of <a href="http://www.emind.co/" target="_blank">Emind</a>, who presented a real life benchmark using that exact approach (<a href="https://www.youtube.com/watch?v=aotCPUtahDU&amp;t=20m02s" target="_blank">"Real-Time Vote Platform Benchmark"</a>).</p>
 
-<p dir="ltr">So, Redis is a piece of software and as such it requires RAM to operate. But Redis is not just any software, it is an in-memory database, which means that every piece of data Redis manages is kept in RAM too. Lets call the RAM that Redis needs to operate the <em>Operational RAM</em>, and name the RAM used for data storage the <em>User Data RAM</em>.</p>
+<p dir="ltr">Emind's use case is a great example of how Redis is put to use in tackling some of the hairier challenges that real-time analytics presents in the context of Big Data and the IoT. The story behind Emind's benchmark brings together all my passions: data, people, technology and the cloud. It is a brilliant experiment designed to identify the best-performing NoSQL database for a real-time voting platform. The voting platform supports large events such as televised talent shows (think "American Idol" or "Rising Star"), where the audience is actively involved and directs the course of the show by voting. The volume and velocity of votes that must be tallied as they come in is staggering, so the platform’s performance must have superstar qualities (much like the shows' participants) to support that kind of traffic.</p>
 
-<h3>What is the airspeed velocity of an unladen swallow?</h3>
+<p dir="ltr">Emind's team identified several NoSQL technologies that could potential power their platform: Aerospike, Cassandra, Couchbase and Redis. While all candidates seemed promising, Emind needed to be sure that it chose the database that would best meet its requirements. To do that, Emind's engineers built a <a href="https://github.com/emind-systems/real_time_vote_benchmark" target="_blank">mock application</a> ("mockapp") in Go that simulated the voting process and tailored it to use each of the different candidates.</p>
 
-<p><img alt="" class="alignleft size-full wp-image-9325" height="165" src="https://redislabs.com/wp-content/uploads/2015/04/Bridge_of_Death_monty_python_and_the_holy_grail_300x200.jpg" style="margin-bottom: 0px;" title="Bridge of Death, Monty Python and the Holy Grail" width="300" />We'll begin our journey with a quick peek at Redis' Operational RAM.</p>
-
-<p>It is used for many purposes and tasks that Redis performs, and one way to think of that chunk of RAM is as all the memory that's used by Redis for everything that isn't the user's data (I'll probably waddle knee-deep into this later on) Redis' RAM footprint is influenced by a myriad of deployment factors, including:</p>
-
-<ul>
-	<li dir="ltr">The server processor's architecture</li>
-	<li dir="ltr">The operating system</li>
-	<li dir="ltr">Redis' version and configuration</li>
-	<li dir="ltr">Probably a lot moar KKs, KUs and UUs</li>
-</ul>
-
-<p dir="ltr">We can easily, however, set a baseline for Redis' operational RAM requirements by examining it at rest on a typical server. For example, the memory footprint of <a href="http://www.imdb.com/title/tt0071853/quotes" target="_blank">unladen African swallow</a> v3.0.0 instance on a virtualized Ubuntu 14 64-bit server is 7995392 bytes (or about 7.6MB). You can quickly determine how much total RAM your Redis instance has allocated from the command line with <span style="font-family: courier new,courier,monospace;">ps</span>' RSS column, or with Redis' <a href="http://redis.io/commands/info" target="_blank"><span style="font-family: courier new,courier,monospace;">INFO</span></a> command:</p>
-
-<pre style="margin-left: 40px;">foo@bar:~$ uname -a
-Linux bar 3.13.0-49-generic #81-Ubuntu SMP Tue Mar 24 19:29:48 UTC 2015 x86_64 x86_64 x86_64 GNU/Linux
-foo@bar:~$ ps aux | grep redis-server
-foo 20139 0.0 0.1 42304 7808 pts/1 Sl+ 19:18 0:00 ./redis-server *:6379
-foo 20143 0.0 0.0 15940 944 pts/9 S+ 19:18 0:00 grep --color=auto redis-server
-foo@bar:~$ redis-cli INFO memory | grep used_memory_rss
-used_memory_rss:7995392</pre>
-
-<p><em><strong>Side note:</strong> the results of from the two methods above </em><em style="line-height: 20.7999992370605px;">and others </em><em>may not always be the same. Also, note that used_memory_rss differs greatly from Redis' used_memory as we'll see.</em></p>
-
-<p dir="ltr">Since this is a freshly initialized Redis instance, we can assume that this figure is a fair representation of our operational baseline. Redis' operational RAM can grow, even significantly, but lets not worry about that for now.</p>
-
-<h3 dir="ltr">What? A swallow carrying a coconut?</h3>
-
-<p dir="ltr"><a href="https://redislabs.com/blog/red-is-beautiful-a-visualization-of-redis-commands" target="_blank">Redis is beautiful</a>, but you don't keep it around just for its pretty face, do you? No, you make Redis manage your data because you need the fastest NoSQL database on the planet today. You let it carry your coconut and depend on it to keep beating its wings forty-three times (so close!) every second. So how much RAM does user data take? That depends on the coconut :)</p>
-
-<p dir="ltr">Redis' schemaless schema* is based on the Key-Value model. Every user datum that Redis manages is primarily a KV pair. It doesn't take a genius to understand that the longer/bigger your keys and values are, the more RAM Redis will need to store it. But Redis does have a few ingenious tricks designed to keep data compacted and organized.</p>
-
-<p dir="ltr"><em>* There is no such as a schemaless database – at most it can have only an implicit one.</em></p>
-
-<p dir="ltr">Let's jump right into it with an example concerning the simplest Redis data type – consider the following:</p>
-
-<pre style="margin-left: 40px;">127.0.0.1:6379&gt; SET swallow coconut
-OK</pre>
-
-<p dir="ltr">How much RAM did we just use? Since all data is organized by keys, the key's name is the first element we'll examine. We know that Redis key names are binary safe strings that can be up to 512MB long. Cool. String values in Redis are also binary safe and up to 0.5GB, so in our example above we can assume 7 bytes for "swallow" and another 7 bytes for the "coconut"… and we'd be wrong, at least partially. Here, let me show you:</p>
-
-<pre style="margin-left: 40px;">127.0.0.1:6379&gt; STRLEN swallow
-(integer) 7
-127.0.0.1:6379&gt; DEBUG SDSLEN swallow
-key_sds_len:7, key_sds_avail:0, val_sds_len:7, val_sds_avail:0
-</pre>
-
-<p dir="ltr">As shown above with <a href="http://redis.io/commands/strlen" target="_blank">STRLEN</a>, Redis insists that the length of the value ("coconut") that's stored under the "swallow" key is 7 bytes long. Even more so, the "secret" DEBUG SDSLEN command also makes the same claims, but what both don't account for is the datum's overhead, and every Redis data structure comes with its own baggage. That means that besides the actual strings ("swallow" and "coconut"), Redis also needs some RAM to manage them.</p>
-
-<p dir="ltr">Since every key-value tuple in Redis uses additional RAM for its internal bookkeeping, and because the amount of that RAM depends on the data structure and the data itself, I consider this overhead, while meta, a part of the user data. Put differently, if for every X bytes string Redis requires X + Y bytes, then Y is definitely a KU that I'd like to make into a KK.</p>
-
-<h3 dir="ltr">String theory</h3>
-
-<p dir="ltr">Strings in Redis are largely implemented by one of <strong>Salvatore Sanfilippo @antirez</strong>'s sub-projects, called <a href="https://github.com/antirez/sds" target="_blank">sds</a> (or Simple Dynamic Strings library for C). While sds strings bring a lot of power and ease of use to Redis internally, they do carry some overhead with them as an sds string is made up of:</p>
-
-<pre style="margin-left: 40px;">+--------+-------------------------------+-----------+
-| Header | Binary safe C alike string... | Null term |
-+--------+-------------------------------+-----------+
-         |
-         `-&gt; Pointer returned to the user.
-</pre>
-
-<p dir="ltr">(diagram courtesy of antirez, <a href="https://github.com/antirez/sds/blob/master/README.md" target="_blank">https://github.com/antirez/sds/blob/master/README.md</a>)</p>
-
-<p dir="ltr">The size of an sds string's header (<a href="https://github.com/antirez/redis/pull/2509" target="_blank">at the moment</a>) is 8 bytes and the null character is an additional byte, which give us a total of 9 bytes overhead per string. The 7 byte long "swallow" suddenly takes more than twice that amount – 16 bytes of RAM – to store in Redis!</p>
-
-<p dir="ltr"><em><strong>Side note:</strong> It actually uses moar. The reference to every key is also stored in Redis' keyspace hash table, which in turn requires even more RAM… And there's also the robj "object" that Redis uses to facilitate some stuff like LRU… But let's just keep the key's management RAM overhead as a KU and throw it into the operational RAM side of the house for now :)</em></p>
-
-<h3 dir="ltr">…four really, if they had the coconut on a line between them</h3>
-
-<p dir="ltr">Back to our swallows and coconuts – so now we know that Redis will use 36 bytes for storing the two strings that make up the key and value in the example above, but is that all? Let's take a closer look at our coconut:</p>
-
-<pre style="margin-left: 40px;">127.0.0.1:6379&gt; OBJECT ENCODING swallow
-"embstr"
-</pre>
-
-<p dir="ltr">The plot thickens (or maybe it's the coconut growing hair?). This cryptic response begs an explanation, but are all coconuts encoded the same? Let's try carrying a few different shapes of string coconuts and see:</p>
-
-<pre style="margin-left: 40px;">127.0.0.1:6379&gt; SET swallow:0 "0"
-OK
-127.0.0.1:6379&gt; SET swallow:1 "An oversized and thickly-haired coconut"
-OK
-127.0.0.1:6379&gt; SET swallow:2 "Ok, this is the mother of all coconuts - it is something that would make Donkey Kong run back to his mama in tears"
-OK
-127.0.0.1:6379&gt; OBJECT ENCODING swallow:0
-"int"
-127.0.0.1:6379&gt; OBJECT ENCODING swallow:1
-"embstr"
-127.0.0.1:6379&gt; OBJECT ENCODING swallow:2
-"raw"
-</pre>
-
-<p dir="ltr">Each of our coconuts is different, so Redis uses different encodings. The "int" encoding is used to efficiently store integer values between <em>LONG_MIN</em> and <em>LONG_MAX</em> (as defined in your environment's <em>limits.h</em>) and also leverages the shared.integers construct to avoid duplicating data. Consequently, these take up less space. On the other hand, strings longer than 39 bytes are stored as "raw", whereas shorter ones use the "embstr" encoding (the magic number is defined by <em>REDIS_ENCODING_EMBSTR_SIZE_LIMIT</em> in <em>redis.h</em>).</p>
-
-<h3 dir="ltr">Going (coco)nuts</h3>
-
-<p><img alt="" class="alignright size-full wp-image-9333" height="200" src="https://redislabs.com/wp-content/uploads/2015/04/coconuts.jpg" style="margin-bottom: 0px;" title="coconuts" width="300" />What about other coconut structures? Strings are the simplest data structure that Redis offers and they are used internally to make other, more advanced structures. The Hash is made of a bunch of Strings (fields &amp; values) added with a dictionary data structure, in which each entry is a linked list… BUT they could be encoded entirely as a ziplist. And speaking of lists, we have the linked lists and ziplists (and perhaps even <strong>Matt Stancliff @mattsta</strong>'s <a href="https://matt.sh/redis-quicklist-visions" target="_blank">quicklists</a> soon) that are also used by Sets and Sorted Sets…</p>
-
-<p>I could go on, <strong>indefinitely</strong>, into the delicate intricacies of data encoding in Redis and how they affect memory consumption. I fear, however, that it will bore all of us to death pretty soon. Alternatively, you can <em>git checkout</em> the <a href="https://github.com/antirez/redis" target="_blank">source code</a> and start reading it – I know a few people who have done it, but you'll need a certain level of programming skills for that.</p>
-
-<p>Which still leaves the big KU – <em>How much RAM does Redis need?</em> – and its little brother KU – <em>How much RAM do coconuts need?</em> – pretty much unanswered. But where there's a will there's a way. Feel free to interact with me via the usual channels – I'm Highly-Available :)</p>
-
-<p><em><strong>Side note:</strong> to be continued.</em></p>			<div class="clearBoth"></div>
+<p dir="ltr">Emind then solicited the services of Avalon Consulting, LLC to ensure the benchmark was executed optimally and impartially. Avalon reviewed and optimized the mockapp's source code, approached each database vendor (Aerospike, Datastax, Couchbase and Redis Labs) for guidance and certification of its respective solution's deployment, executed the benchmark and compiled a <a href="http://redislabs.com/cbc-2015-15-nosql-benchmark" target="_blank">comprehensive report</a> with the results. Check out the full write-up to find out more about how my favorite performer is a rocking superstar. Questions? Feedback? <a href="mailto:itamar@redislabs.com">Email</a> or <a href="https://twitter.com/itamarhaber" target="_blank">tweet</a> me – I'm highly available :)</p>			<div class="clearBoth"></div>
 		</div>
 		<div class="entry-utility">
-			<span class="cat-links"><a href="https://redislabs.com/blog/redis-ram-ramifications-i"> on April 16, 2015 04:11 PM</a></span>
+			<span class="cat-links"><a href="https://redislabs.com/blog/nosql-performance-aerospike-cassandra-datastax-couchbase-redis"> on June 04, 2015 01:00 PM</a></span>
 		</div>
 	</div><!-- .post -->
 
-		<h3 id="todaysDate">January 13, 2015</h3>
+		<h3 id="todaysDate">June 01, 2015</h3>
 
 	<div class="hentry post">
 		<div class="postHeader">
 	<img class="face" src="images/nobody.png" alt="">
 
-			<h2 class="entry-title"><a href="https://redislabs.com/blog/rdb-merger-merge-and-convert-redis-rdb-files" title="Redis Labs">rdb-merger: Merge and Convert Redis RDB Files</a></h2>
+			<h2 class="entry-title"><a href="http://blog.pivotal.io/big-data-pivotal/features/6-free-technical-classes-from-pivotal-education" title="Pivotal P.O.V. » Redis">6 Free Technical Classes From Pivotal Education</a></h2>
+
+<h3>Pivotal</h3>
+
+			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-content">
+<p><img alt="sfeatured-pivotal-education-free" class="alignleft wp-image-33049 size-full" height="220" src="http://blog.pivotal.io/wp-content/uploads/2015/06/sfeatured-pivotal-education-free.png" width="440" />Pivotal Education makes it easy to fully realize the capabilities of our technologies by offering a series of free introductory training courses. Ideal for developers, system architects, and data practitioners, these online courses engage students through a hands-on, sandbox lab environment and provide a technical foundation for more advanced topics taught in other Pivotal courses. The offerings are also uniquely designed to enable technologists at any point of engagement with Pivotal—whether during evaluation or after deployment—to become more well-versed, efficient, and effective in their efforts.</p>
+<p>Our free, introductory training classes span across a wide array of Pivotal technologies, including:  <a href="http://pivotal.io/big-data/pivotal-hd" target="_blank">Pivotal HD</a>, <a href="http://pivotal.io/platform-as-a-service/pivotal-cloud-foundry" target="_blank">Pivotal Cloud Foundry</a>, <a href="http://pivotal.io/big-data/pivotal-greenplum-database" target="_blank">Pivotal Greenplum Database</a>, Pivotal <a href="http://pivotal.io/big-data/pivotal-hawq" target="_blank">HAWQ</a>, <a href="http://redis.io/" target="_blank">Redis</a>, and <a href="http://pivotal.io/big-data/pivotal-gemfire" target="_blank">Pivotal GemFire</a>.</p>
+<p><strong><a href="http://pivotal.io/training#introduction-to-greenplum-database" target="_blank">Intro to Pivotal Greenplum Database</a></strong><br />
+This course is designed to provide an introduction to students new to Pivotal Greenplum Database (GPDB). As a one day course, students will gain a high level overview of features found in GPDB. This introduction will serve as a foundation for further courses that are offered for administrators, DBAs and end users of GPDB.</p>
+<p><strong><a href="http://pivotal.io/training#introduction-to-gemfire" target="_blank">Intro to GemFire</a></strong><br />
+This course is designed to provide an introduction to students new to Pivotal GemFire. As a 1 day course, students will gain a high level overview of features found in GemFire. This introduction will serve as a foundation for further courses that are offered for administrator, developers and architects using GemFire. Some basic high level lab exercises are also offered to enhance the learning experience.</p>
+<p><strong><a href="http://pivotal.io/training#introduction-to-pivotal-hd" target="_blank">Intro to Pivotal HD</a></strong><br />
+This course is designed to provide an introduction to students new to the advanced analytic capabilities of Pivotal HD, our <a href="https://hadoop.apache.org/" target="_blank">Apache Hadoop®</a> distribution. As a one day course, students will gain a high level overview of features found in the Pivotal HD. This introduction will serve as a foundation for further courses that are offered for administrators and architects using Pivotal HD.</p>
+<p><strong><a href="http://pivotal.io/training#ntroduction-to-pivotal-hd-and-hawq" target="_blank">Intro to Pivotal HAWQ</a></strong><br />
+This course is designed to provide an introduction to students new to running SQL on Hadoop®. In this one day course, students will gain a high level overview of features found in HAWQ. This introduction will serve as a foundation for further courses that are offered for administrators, architects and end users of HAWQ.</p>
+<p><strong><a href="http://pivotal.io/training#enterprise-paas" target="_blank">Intro to Pivotal Cloud Foundry</a></strong><br />
+This course provides students with the concepts and hands-on experience needed to work with and deploy applications on Pivotal Cloud Foundry. Students will gain familiarity in general Cloud Foundry concepts (applications, buildpacks, manifests, organizations, spaces, users, roles, domains, routes, services), how to push applications to Cloud Foundry in various languages, services, user provided services, manifests, YAML, environment variables, autoconfiguration, logging and loggregator.</p>
+<p><strong><a href="http://pivotal.io/training#introduction-to-redis" target="_blank">Intro to Redis (2 day course)</a></strong><br />
+This hands-on course provides a broad overview of the Redis NoOSQL datastore, starting with an explanation of product functionality and typical use cases. Students will learn how to install and configure Redis, and examine some of the common commands for manipulating data. They will have the opportunity to create a simple Redis Java application, and review tips and techniques for improving performance. The course explains the use of persistence and replication in Redis, and also includes coverage of some administrative topics such as security and monitoring.</p>
+<p>Whether you are evaluating Pivotal’s products for your company, have already deployed these technologies, or are a student training looking to expand your skillset, Pivotal Education courses present an opportunity to become well-versed in these topics with minimal time commitment and no financial cost.</p>
+<p><a href="http://pivotal.io/training" target="_blank"><b>Learn more about Pivotal’s Education and Training Courses</b></a></p>			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-utility">
+			<span class="cat-links"><a href="http://blog.pivotal.io/big-data-pivotal/features/6-free-technical-classes-from-pivotal-education"> on June 01, 2015 10:21 PM</a></span>
+		</div>
+	</div><!-- .post -->
+
+		<h3 id="todaysDate">May 29, 2015</h3>
+
+	<div class="hentry post">
+		<div class="postHeader">
+	<img class="face" src="images/nobody.png" alt="">
+
+			<h2 class="entry-title"><a href="https://redislabs.com/blog/nosql-bar-datastax-aerospike-couchbase-redis-google-cloud-platform" title="Redis Labs">A Guy Walks Into a NoSQL Bar [Director's Cut]</a></h2>
 
 <h3>Redis Labs</h3>
 
 			<div class="clearBoth"></div>
 		</div>
 		<div class="entry-content">
-<p dir="ltr"><img alt="" class="alignnone size-full wp-image-8086" height="200" src="https://redislabs.com/wp-content/uploads/2015/01/rdb-merger_art.png" title="rdb-merger" width="635" /></p>
+<p><img alt="A Guy Walks Into a NoSQL Bar" class="aligncenter size-full wp-image-9745" height="200" src="https://redislabs.com/wp-content/uploads/2015/05/20150529-art.png" title="A Guy Walks Into a NoSQL Bar" width="635" /></p>
 
-<p dir="ltr">If you're using Redis you probably already know all about its data persistence mechanisms, namely Append-Only-Files (AOF) and RDB files, but if you need a refresher take a few minutes and read <a href="http://redis.io/topics/persistence" target="_blank">this documentation page</a> and <a href="http://oldblog.antirez.com/post/redis-persistence-demystified.html" target="_blank">this blog post</a> to get up to speed quickly. Already back? Good. Now, imagine you have multiple RDB files that you want to merge – how would you do that?</p>
+<h2 dir="ltr">or DataStax, Aerospike, Couchbase and Redis Labs: Serving 1M Writes/Sec From Google Compute Engine</h2>
 
-<p>RDB files essentially contain a snapshot of your Redis database. They provide a convenient and compact (as they are compressed) way to backup your dataset and schlep it around from one place to another. Redis can be configured to automatically take snapshots (with the <span style="font-family: courier new,courier,monospace;">save</span> configuration directive) or you can <span style="line-height: 20.7999992370605px;">manually</span><span style="line-height: 20.7999992370605px;"> </span><span style="line-height: 1.6;">trigger their creation with the </span><a href="http://redis.io/commands/save" style="line-height: 1.6;" target="_blank"><span style="font-family: courier new,courier,monospace;">SAVE</span></a><span style="line-height: 1.6;">/</span><span style="line-height: 1.6; font-family: 'courier new', courier, monospace;"><a href="http://redis.io/commands/bgsave" target="_blank">BGSAVE</a> </span><span style="line-height: 1.6;">commands. Alternatively, you can create an RDB file from a remote Redis server with the </span><span style="line-height: 1.6; font-family: 'courier new', courier, monospace;">redis-cli –rdb</span><span style="line-height: 1.6;"> tool and switch. Redis will also load an RDB file upon startup (when configured to do so with the </span><span style="line-height: 1.6; font-family: 'courier new', courier, monospace;">dir</span><span style="line-height: 1.6;"> and </span><span style="line-height: 1.6; font-family: 'courier new', courier, monospace;">dbfilename</span><span style="line-height: 1.6;"> directives) and will restore the contents of the database from it.</span></p>
+<p dir="ltr">A couple of months ago I published a post over at the Google Cloud Platform blog called <a href="http://googlecloudplatform.blogspot.com/2015/04/a-guy-walks-into-a-NoSQL-bar-and-asks-how-many-servers-to-get-1Mil-ops-a-second.html" target="_blank">"A guy walks into a NoSQL bar and asks: how many servers to get 1 million ops. a second?" </a> That particular post had gone through several editing cycles and I'm very happy with the final result. When I wrote that particular post, I abbreviated my cheeky story, but given <a href="http://blog.couchbase.com/couchbase-server-hits-1m-writes-with-3b-items-with-50-nodes-on-google-cloud" target="_blank">Couchbase's recent announcement</a> about getting to 1M writes/sec with <strong>only 50 servers (!)</strong>, I thought it would be relevant to share the full glory of my analogy here.</p>
 
-<p>Redis creates a single RDB file per Redis server – all shared, a.k.a. numbered, databases are included in that file since they are only logical namespaces inside the same databases (BTW you should really avoid using shared databases – <a href="https://redislabs.com/blog/benchmark-shared-vs-dedicated-redis-instances" target="_blank">here's why</a>). There are cases, however, when you want to take several such RDBs and merge their contents into a single file. The classic use case for this is when your Redis database is sharded across multiple Redis servers, each managing a subset of the keyspace.</p>
+<p><strong>Note:</strong> the joke is still not very funny – suggestions for improvement are welcome!</p>
 
-<p>One possible approach to merging Redis databases, using RDB files, is to:</p>
+<h3 dir="ltr">Preface</h3>
+
+<p dir="ltr">Comparisons are as hard to do right as they are easy to do wrong and when the subjects of comparison are different the problem is only compounded. Therefore, when practicing comparative “advertising” I often feel that the results begotten should be interpreted in spirit rather be presented as numbers to quibble about. With that in mind, let me share a brief related story…</p>
+
+<h3 dir="ltr">Prologue</h3>
+
+<p dir="ltr">A guy walks into a NoSQL bar looking quite upset. "Can I have a glass of red wine and a glass of white wine?" he asks the bartender. "Right away sir," says the bartender, "but may I ask why the long face?" "I was in that other NoSQL bar further down the road, the Spiky Aerrow," answers the patron, "and asked for that exact same order. The server there is known for his speed (some people swear he can do several things at once) as well as the amazing way he prepares drinks, so I was kind of expecting a show."</p>
+
+<p>The bartender, whose bar has been open for quite a few years, nods sympathetically and says, "I'm guessing he didn't quite dazzle you?" "On the contrary," replies the customer, it was an awesome show. To prepare my glass of red, that spectacular master of liquids uncorked no less than 30 bottles of wine in a fraction of a second! He then continued by whirlwinding between all these bottles and pouring a little wine from each into my glass. A lot of wine splashed around and spilled, given the speeds involved, but it was a heck of a show. And then, he did the same thing for the white… but with 50 bottles!"</p>
+
+<h3 dir="ltr">Introduction</h3>
+
+<p dir="ltr">Some time ago, we at Redis Labs set out to answer the question: "How many Google Compute Engine nodes do you need to serve 1 million write operations per second?" The question, besides sounding like a variation of the lightbulb joke, is quite open-ended in terms of defining the actual nature of the write operation based on <a href="http://googlecloudplatform.blogspot.com/2014/12/aerospike-hits-one-million-writes-Per-Second-with-just-50-Nodes-on-Google-Compute-Engine.html" target="_blank"> previous</a> <a href="http://googlecloudplatform.blogspot.com/2014/03/cassandra-hits-one-million-writes-per-second-on-google-compute-engine.html" target="_blank">work</a> on the subject. Given our experience with cloud platforms in general, and particularly with Google's, we were fairly confident that we'd need only a few so we set out to find out.</p>
+
+<h3 dir="ltr">Benchmark Setup</h3>
+
+<p dir="ltr">To run the benchmark, we chose the biggest Google Compute Engine nodes currently available in us-central – the n1-highcpu-16 type – and we ended up using just two such servers to run our Redis Labs Enterprise Cluster software (freely downloadable from <a href="https://redislabs.com/redis-enterprise-downloads" target="_blank">here</a>). We used another pair of servers – this time n1-highcpu-8 – to generate the load with <a href="https://github.com/RedisLabs/memtier_benchmark" target="_blank">memtier_benchmark</a> using the following command line arguments:</p>
+
+<p><code>memtier_benchmark -s 10.0.0.1 -p 6379 --ratio=1:1 --test-time=120 -d 100 -t 2 -c 50 --pipeline=50 --ratio=1:0</code></p>
+
+<h3 dir="ltr">Benchmark Results</h3>
+
+<p dir="ltr">We ran the benchmark three times, first serving only reds reads, then serving only <s>whites</s> writes, and finally both in equal mix. Here are the results from those tests:</p>
 
 <ol>
-	<li dir="ltr">Export each of the databases' contents to a text file – You can do that using a custom script or the incredibly useful <a href="https://github.com/sripathikrishnan/redis-rdb-tools" target="_blank">redis-rdb-tools</a>.</li>
-	<li dir="ltr">Process the resulting text files and concatenate them to a single text file.</li>
-	<li dir="ltr">Load the single text file back into Redis (again using a script or similar).</li>
+	<li dir="ltr">For read-only operations, our Redis database provided throughput of <strong>1.29M read operations per second</strong> at an average latency of 0.15 millisecond per operation.</li>
+	<li dir="ltr">With the write-only load, the cluster's measured throughput was at <strong>1.14M operations per second</strong> at 0.36sec average latency per request.</li>
+	<li dir="ltr">An equal mix of read and write operations gave a throughput of <strong>1.16M operations per second</strong> at an average latency of 0.17msec per operation.</li>
 </ol>
 
-<p>While this approach works just fine it is potentially resource intensive, time consuming and cumbersome. What if you could use your existing RDB files and skip the export stage? What if you could have the merged result as an RDB file and have Redis load it efficiently on startup? Well, with <span style="font-family: courier new,courier,monospace;">rdb-merger</span> you can.</p>
+<p><img alt="Redis Labs Enterprise Cluster on Google Cloud Platform - Over 1M ops/sec" class="aligncenter size-full wp-image-9741" height="492" src="https://redislabs.com/wp-content/uploads/2015/05/20150529-nosql-bar-graph.png" title="Redis Labs Enterprise Cluster on Google Cloud Platform - Over 1M ops/sec" width="789" /></p>
 
-<p><span style="font-family: courier new,courier,monospace;">rdb-merger</span> is a small utility that I've developed to do just that – it accepts multiple RDB files as its input and merges them into a single output file. Using it is as simple as running the following command:</p>
+<p> </p>
 
-<p style="margin-left: 40px;"><span style="font-family: courier new,courier,monospace;">rdb-merger -o outfile.rdb infile1.rdb infile2.rdb</span></p>
+<h3 dir="ltr">Conclusion</h3>
 
-<p>In the example above, <span style="font-family: courier new,courier,monospace;">rdb-merger</span> will create an output file called <span style="font-family: courier new,courier,monospace;">outfile.rdb</span> from two input files: <span style="font-family: courier new,courier,monospace;">infile1.rdb</span> and <span style="font-family: courier new,courier,monospace;">infile2.rdb</span>. The full usage for rdb-merger can be obtained by running it with the <span style="font-family: courier new,courier,monospace;">-h</span> flag:</p>
+<p dir="ltr">Redis needed only two Google Cloud Engine servers in the cluster to cross the 1M op/sec threshold.</p>
 
-<p style="margin-left: 40px;"><span style="font-family: courier new,courier,monospace;">rdb-merger [-h] [-c redis_conf.conf] [-p] -o output_file.rdb input_file.rdb [input_file.rdb ...]</span></p>
+<h3 dir="ltr">Epilogue</h3>
 
-<p>The <span style="font-family: courier new,courier,monospace;">-o</span> switch is mandatory and specifies the output file. Replace it with a single dash ('-') to direct the output to <span style="font-family: courier new,courier,monospace;">stdout</span>. Use the <span style="font-family: courier new,courier,monospace;">-c redis_conf.conf</span> switch to specify the name of a Redis configuration file that will be used during the merger (it can include, for example, different <span style="font-family: courier new,courier,monospace;">*-ziplist-*</span> or <span style="font-family: courier new,courier,monospace;">rdbcompression</span> settings to perform a conversion of the input files). Using the <span style="font-family: courier new,courier,monospace;">-p</span> switch will instruct <span style="font-family: courier new,courier,monospace;">rdb-merger</span> to print the progress percentage to <span style="font-family: courier new,courier,monospace;">stderr</span> during its execution.</p>
+<p dir="ltr">Before the man can finish his story, the bartender had finished preparing the order (using just one bottle of white and one bottle of red, mind you). He placed the drinks alongside the bill in front of the customer, and said "sounds like an amazing show indeed, but I still don't understand why you're so unhappy." "I'll tell you why," answered the man, "guess who had to pay for all 80 bottles of spilled wine?"</p>
 
-<p><strong>Important note:</strong> <span style="font-family: courier new,courier,monospace;">rdb-merger</span> does not check for the correctness of the outputted RDB file. That means that if two or more of your input RDBs contain the same key names, the result will not be a valid RDB file and Redis will not be able to load it.</p>
+<p dir="ltr">The barman smiled and said, "You should consider yourself lucky then, sir. I heard of a place further uptown called Dat Stacks where for every glass of white wine they charge for 300 bottles."</p>
 
-<p><span style="font-family: courier new,courier,monospace;">rdb-merger</span> is currently a part of Redis Labs' <a href="https://github.com/RedisLabs/redis" target="_blank">Redis fork at GitHub</a>. To use it, you'll have to download the sources and run <span style="font-family: courier new,courier,monospace;">make</span> to build Redis. Use it to make the One RDB file to "rule them" all and let me know if you encounter any <a href="https://github.com/RedisLabs/redis/issues" target="_blank">issues</a>.</p>			<div class="clearBoth"></div>
+<p><img alt="1M Ops/Sec on Google Cloud Platform: Your bill, sir" class="aligncenter size-full wp-image-9743" height="1670" src="https://redislabs.com/wp-content/uploads/2015/05/20150529-nosql-bar-info.png" title="1M Ops/Sec on Google Cloud Platform: Your bill, sir" width="1566" /></p>
+
+<p dir="ltr">Ok, so maybe this joke isn't really that funny, but neither is paying too much for less-than-top-notch performance :) With Redis, reaching and exceeding the 1 million operations per second mark doesn't require a truckload of cloud servers – just one or two will do nicely.</p>			<div class="clearBoth"></div>
 		</div>
 		<div class="entry-utility">
-			<span class="cat-links"><a href="https://redislabs.com/blog/rdb-merger-merge-and-convert-redis-rdb-files"> on January 13, 2015 01:32 PM</a></span>
+			<span class="cat-links"><a href="https://redislabs.com/blog/nosql-bar-datastax-aerospike-couchbase-redis-google-cloud-platform"> on May 29, 2015 04:45 PM</a></span>
 		</div>
 	</div><!-- .post -->
 
-		<h3 id="todaysDate">December 31, 2014</h3>
+		<h3 id="todaysDate">May 21, 2015</h3>
 
 	<div class="hentry post">
 		<div class="postHeader">
 	<img class="face" src="images/nobody.png" alt="">
 
-			<h2 class="entry-title"><a href="https://redislabs.com/blog/pop-the-red-boxs-lid-redis-lua-debugger" title="Redis Labs">Pop the Red Box’s Lid: Redis Lua Debugger</a></h2>
+			<h2 class="entry-title"><a href="https://redislabs.com/blog/redis-labs-at-mongodb-world" title="Redis Labs">Redis Labs at MongoDB World!</a></h2>
 
 <h3>Redis Labs</h3>
 
 			<div class="clearBoth"></div>
 		</div>
 		<div class="entry-content">
-<p><img alt="" class="alignnone size-full wp-image-7879" height="200" src="https://redislabs.com/wp-content/uploads/2014/12/rld_art.png" title="Redis Lua Debugger" width="635" /></p>
+<p dir="ltr"><img alt="Redis Cloud - 30MB RAM, 30 Connections for FREE" class="alignnone size-full wp-image-9594" height="200" src="https://redislabs.com/wp-content/uploads/2015/05/mongo-db.png" title="Redis Labs at MongoDB World!" width="635" /></p>
 
-<p>Imagine a red box. You put something in the box and wait for something else to come out (or not). Whatever comes out (or not) of the box depends entirely on what you told the box you wanted it to do. The box originated from <a href="http://antirez.com/news/57" target="_blank">Terrah</a>'s moon so it only understands moon-language, a language that's both foreign and at the same time similar to what you're already used to. For it to do your bidding, you need to explain everything you want it to do in meticulous details, or else the box doesn't work at all. When the box does work, what you get back isn't always what you thought you'd get. The red box has a wry sense of humor and appears to thrive on your growing frustration as you try peeping inside its workings to understand what went wrong.</p>
+<p>The Redis Labs team will be in New York next month to sponsor MongoDB World, MongoDB’s largest end user event, which brings together thousands of Mongo developers, enthusiasts, and influencers from around the world.</p>
 
-<p>This is how I sometimes felt when trying to write even the most trivial Redis Lua scripts. It's not that the box is broken, not at all. The problem's entirely my programmering skillz and the unique tendency I have of sprinkling bugs all over the place. I recently wrote about the <a href="https://redislabs.com/blog/5-methods-for-tracing-and-debugging-redis-lua-scripts" target="_blank">5 Methods For Tracing and Debugging Redis Lua Scripts</a>, but all of these methods (excluding the last one) require tediously adding and removing debug printouts in your code. So I found a better way to do it and the result is our Redis Lua Debugger (or just "rld"), which boasts the following features:</p>
+<p>The event will take place on June 1 – 2 at the Manhattan Sheraton in New York City and welcomes developers and ecosystem partners like Redis Labs. MongoDB and Redis offer complimentary uses cases for both startup and enterprise developers. As we’ve <a href="https://redislabs.com/blog/database-usage-survey-of-aws-reinvent-2014-developers">shared in the past</a>, we find that many developers who use Redis choose to use a wide variety of databases together, including MongoDB and MySQL, to solve a range of challenges for performance-driven use cases.</p>
+
+<p>As usual, the Redis Labs team has a great lineup of activities planned for the event, including:</p>
 
 <ul>
-	<li>A fully non-interactive debugger</li>
-	<li>Easy &amp; native installation, only ~6KB payload</li>
-	<li>Output printing to local and remote consoles</li>
-	<li>Code line execution tracing</li>
-	<li>State-of-the-art automatic watch mechanism, which reports new variables and value changes</li>
-	<li>Reports function calls, returns and arguments – and does on-the-fly profiling</li>
+	<li><strong>Awesome Redis Swag.</strong> Stop by our booth to pick up our popular Redis Geek shirts, onesies and laptop swag!</li>
+	<li><strong>Featured Speaking Session.</strong> Our very own Itamar Haber, Chief Developer Advocate, will be giving a speaking session entitled “Redis &amp; MongoDB: Stop Big Data Indigestion Before It Starts” on June 2nd at 10:00am. Join us for a highly actionable talk and lively Q&amp;A!</li>
+	<li><strong>1-on-1 Meetings.</strong> Book a meeting with any of our team members to discuss how to tap into Redis' performance.</li>
 </ul>
 
-<p>The first thing to know about the Redis Lua Debugger is that it is written in Lua and it runs in Redis. That means you don't need anything besides the script and Redis to use rld. To use rld, you'll first need to load it to your Redis by running it like any regular script – this will cause rld to burrow into your Redis' Lua environment until the next server restart or a call to <span style="font-family: courier new,courier,monospace;">SCRIPT FLUSH</span>.</p>
-
-<p>rld can use both Redis' log file and Pub/Sub (methods 1 and 4 in the abovementioned post, respectively) for its output. To keep track with it just tail the log file and/or subscribe to the `rld` channel. Note that after you've loaded rld, it will stay dormant until explicitly activated by your Lua script and will remain active as long as the script runs or until rld is stopped.</p>
-
-<p>So, to actually use rld for debugging your script, you'll need to switch it on by calling its `start` function – simply add the following line at the beginning of your Lua script:</p>
-
-<p></p>
-
-<p>Now you can run your script. It will be executed normally (or rather abnormally since we are talking about debugging after all) , but at the same time rld will be tracking it and printing information about its execution. Read the output carefully until you've arrived at that Aha!/#facepalm moment.</p>
-
-<p>Here's an example – consider the following Lua script called prog.lua:</p>
-
-<p></p>
-
-<p>Now, load rld (if you haven't already) and run the script – since I'm passing 42 as the argument, I expect it to be the right answer:</p>
-
-<p></p>
-
-<p>Wowza! Wait! What just happened? Easy, just loog in your lok:</p>
-
-<p></p>
-
-<p>Can you say Halle-Lua? Isn't this really va-Lua-ble? rld can be downloaded from <a href="https://github.com/RedisLabs/redis-lua-debugger" target="_blank">https://github.com/RedisLabs/redis-lua-debugger</a>. I hope you'll find it useful at least as much as I had fun making it. Sure, there's still a lot that can be done to improve and extend rld but I feel it's already an MVP so I'm releasing it now. As for prog.lua… well, I'm still trying to remember what I forgot in order to fix it. If you spot the bug, please call tonumber: 555-1234.</p>
-
-<p>Questions? Feedback? Feel free to email me (<a href="mailto:itamar@redislabs.com" target="_blank">itamar@redislabs.com</a>) or tweet me (<a href="https://twitter.com/itamarhaber" target="_blank">@itamarhaber</a>) about anything and everything – I'm highly avai-Lau-ble :)</p>			<div class="clearBoth"></div>
+<p>Questions? Feel free to <a href="mailto:cameron@redislabs.com" target="_blank">email me</a> or reach out on <a href="https://twitter.com/cameronperon" target="_blank">Twitter!</a></p>			<div class="clearBoth"></div>
 		</div>
 		<div class="entry-utility">
-			<span class="cat-links"><a href="https://redislabs.com/blog/pop-the-red-boxs-lid-redis-lua-debugger"> on December 31, 2014 01:39 PM</a></span>
+			<span class="cat-links"><a href="https://redislabs.com/blog/redis-labs-at-mongodb-world"> on May 21, 2015 09:27 AM</a></span>
+		</div>
+	</div><!-- .post -->
+
+		<h3 id="todaysDate">April 06, 2015</h3>
+
+	<div class="hentry post">
+		<div class="postHeader">
+	<img class="face" src="images/nobody.png" alt="">
+
+			<h2 class="entry-title"><a href="http://blog.pivotal.io/big-data-pivotal/products/pivotal-data-roadshow-a-view-from-the-road" title="Pivotal P.O.V. » Redis">Pivotal Data Roadshow: A View From the Road</a></h2>
+
+<h3>Pivotal</h3>
+
+			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-content">
+<p><img alt="featured-BigDataRoadshow" class="alignleft size-full wp-image-11895" height="200" src="http://blog.pivotal.io/wp-content/uploads/2015/04/featured-BigDataRoadshow.png" width="200" />People in the market are hungry for hands-on experience and training with big data technologies.  We are seeing this through the dramatic response to the <a href="https://pivotal.io/big-data/data-roadshow" target="_blank" title="Pivotal Data Roadshow">Pivotal Data Roadshow</a>, which is touring cities across North America this month.  We have been packing the house with nearly 100 participants in each city.  We think this is a good gauge of just how much Apache HadoopⓇ and <a href="http://pivotal.io/big-data/hadoop/sql-on-hadoop" target="_blank" title="SQL on Hadoop">SQL on Hadoop</a> have been embraced within the enterprise to handle big data storage and analytics workloads.</p>
+<p>Big Data technology continues to advance quickly. Just 18 months ago, Pivotal released the world’s first closed-loop platform for analytics and data-driven applications. While big data and <a href="http://hadoop.apache.org" target="_blank" title="Apache HadoopⓇ">Apache HadoopⓇ</a> were moving from niche concerns to tech buzzword status, Pivotal was merging HadoopⓇ with <a href="http://pivotal.io/big-data/pivotal-hawq" target="_blank" title="HAWQ">HAWQ</a>, a robust SQL-on-Hadoop engine, and with real time and <a href="http://pivotal.io/big-data/pivotal-gemfire" target="_blank" title="in-memory data processin">in-memory data processing</a> to round out our vision of how companies should operationalize big data over a <a href="http://pivotal.io/big-data/businessdatalake" target="_blank" title="Business Data Lake">Business Data Lake</a>. It is exciting for us to learn from the roadshows that enterprises are now eagerly embracing SQL-on-Hadoop and in-memory processing technologies to solve business problems, substantiating Pivotal’s strategy and investments over the past five years.</p>
+<p>Attendees of the Pivotal Data Roadshows have included executives, administrators and operations staff, developers, data scientists, and even college students. This variety demonstrates the enormous impact these technologies have on entire industries today and how important they are to each of their futures. Many people in our audiences have already been leveraging our Data Lake solutions as <a href="http://pivotal.io/big-data/pivotal-big-data-suite" target="_blank" title="Pivotal Big Data Suite">Pivotal Big Data Suite</a> customers. These attendees have been impressed by <a href="http://blog.pivotal.io/big-data-pivotal/news-2/pivotal-big-data-suite-open-agile-cloud-ready" target="_blank" title="new customer-centric entitlements">new customer-centric entitlements</a> within the Pivotal Big Data Suite, which includes an instance of <a href="http://pivotal.io/platform-as-a-service/pivotal-cloud-foundry" target="_blank" title="Pivotal Cloud Foundry">Pivotal Cloud Foundry</a>, as well as powerful new additions for real time data ingestion and analysis via tools such as <a href="http://blog.pivotal.io/pivotal/products/spring-xd-for-real-time-analytics" target="_blank" title="Spring XD">Spring XD </a>and <a href="http://blog.pivotal.io/pivotal/case-studies-2/using-redis-at-pinterest-for-billions-of-relationships" target="_blank" title="Redis">Redis</a>.</p>
+<p><img alt="image01" class="alignnone size-full wp-image-11897" height="466" src="http://blog.pivotal.io/wp-content/uploads/2015/04/image011.png" width="615" /></p>
+<p>Demonstrating another key component of <a href="http://pivotal.io/new-approach-to-big-data" target="_blank" title="our 2015 strategy">our 2015 strategy</a>, the entire technical portion of the Pivotal Data Roadshow really highlights our robust cloud capabilities. All our attendee sessions are hosted in an enterprise public cloud infrastructure, spun up quickly and seamlessly in minutes.  This enables us to rapidly provision 50 IoT analytics labs across our entire product set. Attendees quickly initiate analytics workflows that ingest Twitter streams and execute real time analytics across our in memory database, Gemfire. Most impressively, this all gets developed in under 5 minutes, using only two Spring XD commands, replacing what used to be hours of complex and specialized programming.  Spring XD really has emerged as the star of the show, thanks to the streamlined, easy-to-understand interface it provides for our products, third party technologies, and its ability to manage either private, public, big, or fast data jobs.</p>
+<p>Attendees have stayed hours past the scheduled end time, enjoying building out new analytics pipelines with our expert engineering teams. They also left with their lab environments equipped to continue their experiences on their own cloud, learning into the future.</p>
+<p>If you’re interested in how big data and advanced analytics are changing companies, and would like to get your hands directly on the world’s best technology for leveraging them, be sure to check out one of the upcoming Pivotal Data Roadshows.</p>
+<p><img alt="image00" class="alignnone size-full wp-image-11898" height="273" src="http://blog.pivotal.io/wp-content/uploads/2015/04/image001.png" width="787" /></p>
+<p><b>Upcoming Dates for the Pivotal Data Roadshow</b></p>
+<ul>
+<li>Toronto, April 14</li>
+<li>New York City, April 16</li>
+<li>Washington, DC, April 21</li>
+<li>Atlanta, April 23</li>
+<li>Denver, April 28</li>
+<li>Dallas/Fort Worth, April 30</li>
+</ul>
+<p><b>Further information:</b></p>
+<ul>
+<li><a href="https://pivotal.io/big-data/data-roadshow" target="_blank" title="Register for the Pivotal Data Roadshow">Register for the Pivotal Data Roadshow</a></li>
+<li><a href="http://pivotal.io/big-data/pivotal-big-data-suite" target="_blank" title="Learn more about the Pivotal Big Data Suite">Learn more about the Pivotal Big Data Suite</a></li>
+<li>Learn more about <a href="http://blog.pivotal.io/pivotal/products/spring-xd-for-real-time-analytics" target="_blank" title="Spring XD">Spring XD</a> and <a href="http://blog.pivotal.io/pivotal/case-studies-2/using-redis-at-pinterest-for-billions-of-relationships" target="_blank" title="Redis">Redis</a></li>
+</ul>
+<p><i>Editor’s Note: Apache, Apache Hadoop, Hadoop, and the yellow elephant logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</i></p>			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-utility">
+			<span class="cat-links"><a href="http://blog.pivotal.io/big-data-pivotal/products/pivotal-data-roadshow-a-view-from-the-road"> on April 06, 2015 03:09 PM</a></span>
+		</div>
+	</div><!-- .post -->
+
+		<h3 id="todaysDate">October 13, 2014</h3>
+
+	<div class="hentry post">
+		<div class="postHeader">
+	<img class="face" src="images/nobody.png" alt="">
+
+			<h2 class="entry-title"><a href="http://blog.pivotal.io/pivotal/case-studies-2/mobile-video-big-data-architecture-with-spring-xdhadoophawqredis-measuring-live-usage" title="Pivotal P.O.V. » Redis">Mobile Video Big Data Architecture with Spring XD/Hadoop/HAWQ/Redis: Measuring Live Usage</a></h2>
+
+<h3>Pivotal</h3>
+
+			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-content">
+<p><a href="http://blog.pivotal.io/wp-content/uploads/2014/10/featured-football-spectators-phone.jpg"><img alt="featured-football-spectators-phone" class="alignleft size-full wp-image-10870" height="200" src="http://blog.pivotal.io/wp-content/uploads/2014/10/featured-football-spectators-phone.jpg" width="200" /></a>Earlier this year, <a href="http://www.emarketer.com/Article/Tablets-Challenge-PCs-Leading-Digital-Video-Channel-US/1010807" target="_blank" title="mobile video usage overtook video usage on personal computers">mobile video usage overtook video usage on personal computers</a> and research continues to show how important mobile video is to consumers. With these trends, mobile carriers and media companies are trying to learn more about usage to improve user experience and advertising revenues, especially with big advertising money makers like sports.</p>
+<p>Earlier this year, a major sports network and mobile carrier approached Pivotal to create a system for measuring cellular data and live video usage through mobile applications. The approach used <a href="http://projects.spring.io/spring-xd/" target="_blank" title="Spring XD">Spring XD</a>, <a href="http://www.pivotal.io/big-data/pivotal-hd" target="_blank" title="Pivotal HD">Pivotal HD</a>, <a href="http://www.pivotal.io/big-data/redis" target="_blank" title="Redis">Redis</a>, and <a href="http://projects.spring.io/spring-boot/" target="_blank" title="Spring Boot">Spring Boot</a> to quickly build a big data platform and set of analytical dashboards. The resulting analytics application is helping business executives from both companies understand how live video is used and what peak data usage looks like. The whole project only took a few resources and a few months.</p>
+<h2><strong>Mobile/Media Big Data Architecture Overview</strong></h2>
+<p>At a high level, data moves through a factory as depicted in the diagram below. Raw data is captured from mobile phones in JSON format by a Spring XD cluster where several processes are performed. The data is then stored in an HDFS cluster where Spring XD batch jobs use SQL via the HAWQ interface to HDFS and store the calculated reports in Redis. Spring Boot is then used with Angular.js and D3.js to show analytics to end users.</p>
+<p><a href="http://blog.pivotal.io/wp-content/uploads/2014/10/ProLeague+Mobile-SolutionsArchitecture.png"><img alt="ProLeague+Mobile-SolutionsArchitecture" class="alignnone size-full wp-image-10871" height="239" src="http://blog.pivotal.io/wp-content/uploads/2014/10/ProLeague+Mobile-SolutionsArchitecture.png" width="615" /></a></p>
+<h2><strong>Capturing Raw Data from Mobile Devices in JSON</strong></h2>
+<p>To produce the raw data, a mobile device is instrumented to capture the number of bytes used while viewing a video. The mobile application sends a “heartbeat” message that is formatted in JSON and contains the number of bytes consumed since the last report. Generally, the mobile app sends one of these reports every minute. Since there can be a large number of viewers during a live game, the system receives millions of heartbeat messages per hour. When designing the system, we decided to keep all of the heartbeat data over time, as with the concept of keeping all data inside a <a href="http://blog.pivotal.io/pivotal/news-2/from-data-silos-to-data-lakes-realizing-the-accessible-dream" target="_blank" title="data lake">data lake</a>. This way, teams could use the data to produce additional analysis in the future. In addition, the customers had a quick timeline. They needed the system in place prior to the start of the next sports season.</p>
+<h2><strong>Ingesting and Processing Data with Spring XD and HDFS</strong></h2>
+<p>To handle the data ingestion, the Pivotal team utilized <a href="http://projects.spring.io/spring-xd/" target="_blank" title="Spring XD">Spring XD</a> to receive and transform the raw data. The processed data was stored in an <a href="http://hadoop.apache.org" target="_blank" title="Apache Hadoop">Apache Hadoop®</a> File System (HDFS) cluster as part of <a href="http://www.pivotal.io/big-data/pivotal-hd" target="_blank" title="Pivotal HD">Pivotal HD</a>. Spring XD and HDFS provided a flexible, scalable solution to handle the massive amount of incoming JSON heartbeat data—as much as a half terabyte per season of sports.</p>
+<p>After the data was stored in HDFS, we used Pivotal HAWQ and SQL to generate the necessary reports from the data stored in HDFS. Spring XD’s batch job capability was leveraged to execute the reports after a game was done. The batch jobs produced JSON reports and stored them in <a href="http://blog.pivotal.io/tag/redis" target="_blank" title="Redis">Redis</a>, providing immediate access to a web-based dashboard. Spring XD and Pivotal HD provided clustering and failover support to ensure business continuity in the event of a server failure.</p>
+<p>Spring XD turned out to be a perfect solution because it was designed with a distributed and extensible pipeline for ingesting data, processing it, performing real-time analytics on the received data, and then exporting it. Using Spring XD, we quickly implemented a system to receive the raw heartbeat data from the mobile applications. Spring XD provides several “sources” and “sinks” out of the box, and we were able to modify the existing HTTP source and HDFS sink to receive and store the raw heartbeat data. We also created a custom “processor” module that enabled us to filter and validate the raw data, ensuring that it was formatted as expected and had valid data in the expected JSON fields. Spring XD also provided a mechanism to “tap” data from one stream to another. Using a tap, it was simple for us to configure a stream to count the number of heartbeat packets received. This allowed us to ensure the system worked as expected—we could see the amount of live data going through the system in real-time. Since Spring XD supports a distributed runtime deployment, it also ensured that inbound data would continue to process in the event of any server failure.</p>
+<h2><strong>Creating Analytical Reports with Spring XD, HAWQ, Redis, and Spring Boot</strong></h2>
+<p>With HDFS storing the raw data, we used the <a href="http://blog.pivotal.io/pivotal/products/json-on-hadoop-example-for-extending-hawq-data-formats-using-pivotal-extension-framework-pxf" target="_blank" title="Pivotal Xtension Framework">Pivotal Xtension Framework</a> (PXF) and <a href="http://blog.pivotal.io/tag/hawq" target="_blank" title="HAWQ">HAWQ</a> to perform SQL queries directly against the JSON data. PXF maps the JSON to columns in a database, enabling HAWQ to execute SQL queries directly against the JSON data in HDFS. Using SQL, the product manager could then define the report queries.</p>
+<p>For the next step, we turned to Spring XD’s batch capabilities. Custom “jobs” were configured with the appropriate SQL queries to execute. The jobs are scheduled to execute early in the morning, after a game has occurred, and the report results are stored in Redis. Redis stores all the reports so that users can view any of them without needing to spend the time computing them on demand. Finally, we implemented a simple REST API, using <a href="http://blog.pivotal.io/tag/spring-boot" target="_blank" title="Spring Boot">Spring Boot</a>, to serve the JSON reports to the user interface.</p>
+<p>A web-based dashboard was also built and allows users to easily view the weekly reports as they are available. Here, Spring Boot was used with JavaScript libraries like <a href="https://angularjs.org/" target="_blank" title="Angular.js">Angular.js</a> and <a href="http://d3js.org/" target="_blank" title="D3.js">D3.js</a>. Spring Boot and Spring Security were used to quickly secure the dashboard by adding a login page and requiring HTTPS for access.</p>
+<p>Together, Spring XD, Pivotal HD and HAWQ, Redis, and Spring Boot were used to quickly create a big data solution for massive ingesting, analyzing, and reporting on cellular data use for live, game-day videos. Now, the client can identify trends and optimize media revenue.</p>
+<p><strong>Learn More:</strong></p>
+<ul>
+<li>Spring XD: <a href="http://projects.spring.io/spring-xd/" target="_blank" title="Project and Documentation">Project and Documentation</a> | <a href="http://blog.pivotal.io/tag/spring-xd" target="_blank" title="Blog Articles">Blog Articles</a> | <a href="http://blog.pivotal.io/pivotal/products/spring-xd-for-real-time-analytics" target="_blank" title="Using XD for Real Time Twitter">Using XD for Real Time Twitter</a></li>
+<li>Pivotal HD (SQL on HDFS via HAWQ): <a href="http://www.pivotal.io/big-data/pivotal-hd" target="_blank" title="Product">Product</a> | <a href="http://pivotalhd.docs.pivotal.io/doc/2010/index.html" target="_blank" title="Documentation">Documentation</a> | <a href="http://blog.pivotal.io/tag/pivotal-hd" target="_blank" title="Blog Articles">Blog Articles</a></li>
+<li>Redis: <a href="http://blog.pivotal.io/tag/redis/redis.io" target="_blank" title="Website">Website</a> | <a href="http://blog.pivotal.io/tag/redis" target="_blank" title="Blog Articles">Blog Articles</a></li>
+<li>Spring Boot: <a href="http://projects.spring.io/spring-boot/" target="_blank" title="Project and Documentation">Project and Documentation</a> | <a href="http://blog.pivotal.io/tag/spring-boot" target="_blank" title="Blog Articles">Blog Articles</a></li>
+<li>Pivotal Open Source: <a href="http://www.pivotal.io/oss" target="_blank" title="Products and Projects">Products and Projects</a> | <a href="http://blog.pivotal.io/tag/open-source" target="_blank" title="Blog Articles">Blog Articles</a></li>
+</ul>
+<p><em><strong>Editor’s Note</strong>: Apache, Apache Hadoop, Hadoop, and the yellow elephant logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</em></p>			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-utility">
+			<span class="cat-links"><a href="http://blog.pivotal.io/pivotal/case-studies-2/mobile-video-big-data-architecture-with-spring-xdhadoophawqredis-measuring-live-usage"> on October 13, 2014 09:43 AM</a></span>
+		</div>
+	</div><!-- .post -->
+
+		<h3 id="todaysDate">October 08, 2014</h3>
+
+	<div class="hentry post">
+		<div class="postHeader">
+	<img class="face" src="images/nobody.png" alt="">
+
+			<h2 class="entry-title"><a href="http://blog.pivotal.io/pivotal/news-2/apache-way-at-pivotal" title="Pivotal P.O.V. » Redis">Apache Way at Pivotal</a></h2>
+
+<h3>Pivotal</h3>
+
+			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-content">
+<p><img alt="featured-feathers" class="alignleft size-full wp-image-10839" height="200" src="http://blog.pivotal.io/wp-content/uploads/2014/10/featured-feathers.png" width="200" />Ever since I joined Pivotal, one of my favorite topics of cocktail conversation has become explaining to folks unfamiliar with the company just how much of a <a href="http://blog.pivotal.io/pivotal/products/open-source-is-pivotal" target="_blank" title="Open Source is Pivotal">quintessential open source shop we are</a>. Just rattling off the names of the projects and communities we stand behind feels like listing ‘who’s who’ of open source. Being a betting man as I am, I typically introduce Pivotal by making a $1 bet that whoever I’m talking to is likely to have used software we contribute to at some point in their career. Given that this list includes <a href="http://www.pivotal.io/platform-as-a-service/pivotal-cf" target="_blank" title="Cloud Foundry">Cloud Foundry</a>, <a href="http://projects.spring.io/spring-framework/" target="_blank" title="Spring Framework">Spring Framework</a>, <a href="http://groovy.codehaus.org/" target="_blank" title="Groovy">Groovy</a>, <a href="https://grails.org/" target="_blank" title="Grails">Grails</a>, <a href="http://www.pivotal.io/big-data/redis" target="_blank" title="Redis">Redis</a>, <a href="http://www.pivotal.io/products/pivotal-rabbitmq" target="_blank" title="RabbitMQ">RabbitMQ</a>, <a href="http://tomcat.apache.org/" target="_blank" title="Tomcat">Tomcat</a> and most recently <a href="http://hadoop.apache.org" target="_blank" title="Apache Hadoop">Apache Hadoop®</a> the only folks I ever lose to are the poor souls still stuck on Windows 95 or mainframes. Paying $1 to them feels less like losing a bet, and more like a random act of kindness.</p>
+<p>As a side note, this incredible diversity of Pivotal’s open source portfolio helps our business model a great deal. After all, the days when one could have a sizable stand-alone business built around a single open source project are as distant as dial-up internet access. There’s a lot to be said on what a winning open-source strategy looks like (I may dare defining one in one of my future blog posts). Whatever it is, if you are an enterprise infrastructure vendor in 2014, you can’t survive without having one. The market has clearly spoken in favor of enterprise infrastructure products built around open source projects. With this came a realization that the only sustainable way of doing so was to build long-term relationships with open source communities. This, of course, meant that business now found themselves thinking deep and hard about open source community governance.</p>
+<p>It is perhaps ironic, that the single most important detail of how open source communities operate doesn’t get as much air time as licensing or patenting. Somehow there’s a perception that open source communities don’t even need much of governance. They are expected to self-organize into utopian worker collectives that could serve as a living illustration to “from each according to his ability, to each according to his need” principle. Nothing can be further from the truth. Each big, successful open source community is unique and typically very particular about the governance model. Open source communities, and by extension projects that they work on, live and die by how effective their governance model is. A great community can alway fix technology, a poor community is bound to ruin the best technology that is entrusted to it.</p>
+<p>Now, remember my earlier point about the sheer size of Pivotal’s open source portfolio? Community governance is where it starts to matter yet again. Because you see, regardless of how much a runaway success Spring is (and standing at 8+ million users nobody would argue it isn’t) the governance model that made it so successful is unique to it. It is true that Spring uses Apache License, but the similarities with the Apache Software Foundation (ASF) governance model ends there.</p>
+<p>ASF governance model, also known as “The Apache Way”, is a very unique, extremely well thought out approach to building successful open source communities. Communities that are capable of innovating on a diverse set of projects all living under the Foundation’s umbrella. “The Apache Way” has been covered in great details over the years, its elevator pitch fits in just three words: “Community over code”. No really, that is it—everything else is an implementation detail.</p>
+<p>It must be said, that even before I joined Pivotal, the company has had a relationship with the ASF. We have been a constant sponsor of the Foundation and with guys like Mark Thomas and Bill Rowe working for Spring side of Pivotal “The Apache Way” was practiced quite well when it comes to Apache Tomcat and Apache HTTPD. At the same time, the scale at which Datafabrics side of Pivotal has embraced ASF projects around Apache Hadoop® ecosystem required a different level of focus on ASF.</p>
+<p><a href="http://www.pivotal.io/careers"><img alt="cta-hiring" class="alignnone size-full wp-image-9320" height="135" src="http://blog.pivotal.io/wp-content/uploads/2014/06/cta-hiring.png" width="600" /></a></p>
+<p>So that was part of my mission when joining Pivotal: become a resident ASF guy for data technologies organization and <em>make sure that in a year’s time Pivotal becomes a company that grows the pool of Apache Committers, not a company that just fights over the existing pool.</em></p>
+<p>This project started with putting a framework in place that enables Pivotal engineers to collaborate on ASF software with minimum distraction (this required a close collaboration with our outstanding legal team). Our next step was to review our product roadmap and based on customer’s feedback start focusing on a project that they needed. This is what our <a href="http://blog.pivotal.io/pivotal/features/strengthening-hadoop-in-the-enterprise-with-apache-ambari" target="_blank" title="Strengthening Apache Hadoop in the Enterprise with Apache Ambari">previous announcement around Apache® Ambari</a> was all about.</p>
+<p>In the short couple of month we have not only contributed a <a href="https://issues.apache.org/jira/browse/AMBARI-7292" target="_blank" title="AMBARI-7292">wide</a> <a href="https://issues.apache.org/jira/browse/AMBARI-7551" target="_blank" title="AMBARI-7551">variety</a> of improvements to it, but also helped the project get more stable by working on<a href="https://builds.apache.org/view/All/job/Ambari-trunk-Commit/" target="_blank" title="Ambari-trunk-Commit"> build </a>and <a href="https://issues.apache.org/jira/browse/AMBARI-7209" target="_blank" title="AMBARI-7209">CI automation</a> and suggesting <a href="http://markmail.org/message/rs5j5j365txapalm" target="_blank" title="Proposal">process improvements</a> to innovate even quicker while not losing the sense of project stability. Pivotal’s product has benefited from this relationship, but so did Apache® Ambari: it has become better and more featureful, but most importantly its community has grown stronger and more diverse. In fact, recognizing all the hard work that one of Pivotal’s engineers Jun Aoki has put into the project, the Apache® Ambari PMC has <a href="http://markmail.org/message/dwfwtercyj3s6moq" target="_blank" title="Jun invited to Ambari">voted</a> Jun in as a committer.</p>
+<p>This may be a small step for Jun (and, to be sure, the first one in many other ASF projects that he is going to join), but it actually signifies a giant leap for Pivotal and the kind of role it is assuming in ASF from now on. We’re already delivering on that fundamental vision of making sure that our engineers get fully empowered to lead most impactful open source projects within the Foundation. If you are an engineer dreaming to add the coveted Committer/PMC of Apache X to your resume, join us. We can’t guarantee that you will get that line (after all, ASF recognizes your personal merit and your personal merit alone) but we can guarantee that we will move heaven and earth to empower you to do so.</p>
+<p>After all a stronger Apache Software Foundation (ASF) will benefit the entire industry. It is, you see, that proverbial tide that lifts all boats big and small.</p>
+<p><em><strong>Editor’s Note</strong>: Apache, Apache Hadoop, Hadoop, and the yellow elephant logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</em></p>			<div class="clearBoth"></div>
+		</div>
+		<div class="entry-utility">
+			<span class="cat-links"><a href="http://blog.pivotal.io/pivotal/news-2/apache-way-at-pivotal"> on October 08, 2014 04:27 PM</a></span>
 		</div>
 	</div><!-- .post -->
 
@@ -670,270 +716,6 @@ Server: Jetty(8.1.15.v20140411)
 		</div>
 	</div><!-- .post -->
 
-		<h3 id="todaysDate">September 05, 2014</h3>
-
-	<div class="hentry post">
-		<div class="postHeader">
-	<img class="face" src="images/nobody.png" alt="">
-
-			<h2 class="entry-title"><a href="http://blog.pivotal.io/pivotal/products/easy-pivotal-app-installs-rpm-deb-msi-brew-chef-puppet-and-more" title="Pivotal P.O.V. » Redis">Easy Pivotal App Installs: RPM, deb, MSI, BREW, Chef, Puppet, and More</a></h2>
-
-<h3>Pivotal</h3>
-
-			<div class="clearBoth"></div>
-		</div>
-		<div class="entry-content">
-<p><a href="http://blog.pivotal.io/wp-content/uploads/2014/09/featured-packaging-deployment-monitoring.png"><img alt="featured-packaging-deployment-monitoring" class="alignleft size-full wp-image-10543" height="200" src="http://blog.pivotal.io/wp-content/uploads/2014/09/featured-packaging-deployment-monitoring.png" width="200" /></a>In the current software development world, deployment automation and cloud monitoring are pushing all of us to use tools like RPM, deb, MSI, Homebrew, Chef, and Puppet for deployment and solutions like Hyperic and New Relic for monitoring.</p>
-<p dir="ltr">With this in mind, Pivotal provides packaging that streamlines the development, deployment, and scale of modern applications across public and private infrastructure. In this blog post, we highlight these specific offerings that facilitate middleware deployment and monitoring. Pivotal’s packaging engineering team has created OS-native install packages for the most popular operating systems as well as the leading provisioning automation platforms.</p>
-<p>In this blog post, we cover deployment and monitoring of Pivotal App Suite’s Commercial and OSS middleware products on most popular OS platforms so that anyone can use familiar methods to quickly and accurately install and configure components of the <a href="http://www.pivotal.io/products/pivotal-app-suite" target="_blank" title="Pivotal App Suite">Pivotal App Suite</a>. The following commercial and open source projects are covered:</p>
-<p><strong>Commercial Products</strong></p>
-<ul>
-<li><a href="http://www.pivotal.io/products/pivotal-tc-server" target="_blank" title="Pivotal tc Server">Pivotal tc Server</a> – with Spring Insight, Gemfire Session, and Hibernate caching</li>
-<li><a href="http://www.pivotal.io/products/pivotal-rabbitmq" target="_blank" title="Pivotal RabbitMQ">Pivotal RabbitMQ</a> – includes the JMS client</li>
-<li><a href="http://www.pivotal.io/products/pivotal-web-server" target="_blank" title="Pivotal Web Server">Pivotal Web Server</a> – includes the APR connector for Tomcat &amp; tc Server</li>
-</ul>
-<p><strong>Open Source Projects</strong></p>
-<ul>
-<li><a href="http://redis.io" target="_blank" title="Redis">Redis</a></li>
-<li><a href="http://rabbitmq.com" target="_blank" title="RabbitMQ">RabbitMQ</a></li>
-<li><a href="http://projects.spring.io/spring-xd/" target="_blank" title="Spring XD">Spring XD</a></li>
-</ul>
-<h2><strong>About the Pivotal App Suite Installers</strong></h2>
-<p>Pivotal App Suite commercial products are available in many binary formats and supported on every major production and developer platform. The Pivotal engineering team has made installation a priority—making the experience lightweight and convenient for our customers and partners.</p>
-<p>In most cases, you can install and get Pivotal App Suite products running with couple of commands. Pivotal provides public <a href="http://en.wikipedia.org/wiki/Yellowdog_Updater,_Modified" target="_blank" title="YUM">YUM</a> and <a href="http://en.wikipedia.org/wiki/Advanced_Packaging_Tool" target="_blank" title="APT">APT</a> repositories for easy installation of Pivotal App Suite products on popular Linux platforms (RHEL, CentOS, and Ubuntu), Windows MSI installers for Windows server and desktop platforms, and a <a href="http://brew.sh" target="_blank" title="Homebrew">Homebrew tap</a> for Mac OSX.</p>
-<h2><strong>Installers</strong></h2>
-<h3><strong>RHEL/CentOS</strong></h3>
-<p>For RHEL and CentOS platforms, Pivotal App Suite products are available in RPM binaries and can be downloaded and installed manually from the <a href="https://network.pivotal.io" target="_blank" title="Pivotal Network">Pivotal Network</a>. But the recommended way is to use Pivotal’s yum repository to install on command line and automate upgrades. If you use Puppet or Chef there’s even better way to manage installation. Later we will also show you where to access our Puppet modules and Chef cookbooks.</p>
-<p>To configure Pivotal’s yum repository as user root:<br />
-<code> wget -q -O - packages.pivotal.io | sh</code></p>
-<p>To configure Pivotal yum repository as an unprivileged user using sudo:<br />
-<code>wget -q -O - packages.pivotal.io | sudo sh</code></p>
-<p>Once you have the repository configured you can search and install Pivotal App Suite products:<br />
-<code>yum search pivotal</code></p>
-<p><code>sudo yum install pivotal-tc-server-standard<br />
-sudo yum install pivotal-web-server<br />
-sudo yum install pivotal-rabbitmq-server<br />
-sudo yum install pivotal-redis<br />
-sudo yum install spring-xd</code></p>
-<p>Service scripts are provided and registered with chkconfig. By default the services will not start at boot. To change this behavior use chkconfig such as this:<br />
-<code>chkconfig --level 35 rabbitmq-server on</code></p>
-<p>This example configures rabbitmq-server to start on runlevels 3 and 5.</p>
-<p>Pivotal App Suite products are installed under /opt/pivotal and processes run under unprivileged users which all use the pivotal group. Pivotal tc Server Standard and Pivotal Web Server require instances to be configured. For documentation on how to create instances and for specifics on other packages see these links:</p>
-<ul>
-<li><a href="http://tcserver.docs.pivotal.io/doc/30/index.html#getting-started/src/install.html#install-standard-rpm" target="_blank" title="Pivotal tcServer Standard "><b>Pivotal tc Server Standard</b></a></li>
-<li><a href="http://webserver.docs.pivotal.io/doc/60/index.html#web-server/src/install.html#install-rpm" target="_blank" title="Pivotal Web Server "><b>Pivotal Web Server</b></a></li>
-<li><a href="http://rabbitmq.docs.pivotal.io/doc/33/index.html#getstart/src/install-getstart.html#install-RHEL" target="_blank" title="RabbitMQ"><b>RabbitMQ</b></a></li>
-<li><a href="http://redis.docs.pivotal.io/doc/2x/index.html#getting-started/src/install.html#topic_q3g_vzs_yn" target="_blank" title="Redis"><b>Redis</b></a></li>
-<li><a href="http://docs.spring.io/spring-xd/docs/1.0.0.RELEASE/reference/html/#_redhat_centos_installation" target="_blank" title="Spring XD"><b>Spring XD</b></a></li>
-</ul>
-<h3><strong>Debian/Ubuntu</strong></h3>
-<p>Add Pivotal APT repository as user root:<br />
-<code>wget -q -O - packages.pivotal.io | sh</code></p>
-<p>Add Pivotal APT repository as an unprivileged user using sudo:<br />
-<code>wget -q -O - packages.pivotal.io | sudo sh</code></p>
-<p>Search and install Pivotal App Suite products<br />
-<code>apt-cache search pivotal</code></p>
-<p><code>sudo apt-get install pivotal-tc-server-standard<br />
-sudo apt-get install pivotal-web-server<br />
-sudo apt-get install rabbitmq-server<br />
-sudo apt-get install pivotal-redis</code></p>
-<p>Service scripts are provided. Only rabbitmq-server starts automatically upon installation. Pivotal-tc-server-standard and pivotal-webserver require instances to be created prior to configuring startup runlevels. To enable startup upon boot use update-rc.d such as this:<br />
-<code>update-rc.d pivotal-redis-6379 defaults</code></p>
-<p>This example configures the default pivotal-redis instance to start on runlevels 2-5. Pivotal App Suite products are installed under /opt/pivotal and processes run under unprivileged users which all use the pivotal group.</p>
-<p>For documentation specific to these packages see these links:</p>
-<ul>
-<li><a href="http://tcserver.docs.pivotal.io/doc/30/index.html#getting-started/src/install.html#install-standard-deb " target="_blank" title="Pivotal tcServer Standard"><b>Pivotal tcServer Standard</b> </a></li>
-<li><a href="http://webserver.docs.pivotal.io/doc/60/index.html#web-server/src/install.html#install-debian" target="_blank" title="Pivotal Web Server"><b>Pivotal Web Server</b></a></li>
-<li><a href="http://rabbitmq.docs.pivotal.io/doc/33/index.html#getstart/src/install-getstart.html#install-deb" target="_blank" title="RabbitMQ"><b>RabbitMQ</b></a></li>
-<li><a href="http://redis.docs.pivotal.io/doc/2x/index.html#getting-started/src/install.html#topic_elr_5qr_h4" target="_blank" title="Redis"><b>Redis</b></a></li>
-</ul>
-<h3><strong>Mac OSX</strong></h3>
-<p>Assuming you have already installed <a href="http://brew.sh" target="_blank" title="Homebrew">Homebrew</a>, add Pivotal’s homebrew tap.<br />
-<code>brew tap pivotal/tap</code></p>
-<p>Install Pivotal App Suite Products and more<br />
-<code>brew install tcserver<br />
-brew install rabbitmq<br />
-brew install redis<br />
-brew install springxd<br />
-brew install springboot<br />
-brew install gemfire</code></p>
-<p>Additional information for Pivotal’s Homebrew tap is available at <a href="https://github.com/pivotal/homebrew-tap">https://github.com/pivotal/homebrew-tap</a>.</p>
-<h3><strong>Windows</strong></h3>
-<p>For Windows we provide MSI package file formats for tc Server, Web Server and RabbitMQ. Windows installers can be downloaded from <a href="https://network.pivotal.io" target="_blank" title="Pivotal Network">Pivotal Network</a>.</p>
-<h2><strong>Configuration and Deployment Management</strong></h2>
-<p>For users already familiar with DevOps tools we have open sourced Puppet modules and Chef cookbooks for configuration and management of Pivotal App Suite. Both Chef and Puppet help automate software configuration and deployment for single or thousands of nodes. The starter scripts for both DevOps tools can help you automate the deployment and management of Pivotal App Suite products quickly.</p>
-<h3><strong>Puppet</strong></h3>
-<p>Pivotal App Suite products can be deployed and managed using Puppet. Modules for Pivotal App Suite products are available under following Github repository. Modules make use of Pivotal’s yum and apt-get repositories so you won’t have to search for App Suite binaries or download and install them manually.</p>
-<p><a href="https://github.com/pivotal/app-manage/tree/master/puppet">https://github.com/pivotal/app-manage/tree/master/puppet</a></p>
-<h3><strong>Chef</strong></h3>
-<p>Pivotal App Suite products can be deployed and managed using Chef. Cookbooks for Pivotal App Suite products are available under following Github repository. The repo is organized by product name. Each product folder had a README file describing how to use the cookbook and the actions it provide. Similar to Puppet modules, cookbooks are tied to Pivotals yum and apt-get repositories so you won’t have to search for App Suite binaries or download and install them manually.</p>
-<p><a href="https://github.com/pivotal/app-manage/tree/master/chef-repo">https://github.com/pivotal/app-manage/tree/master/chef-repo</a></p>
-<h2><strong>Monitoring</strong></h2>
-<p>Pivotal App Suite products expose extensive monitoring metrics through JMX, BMX and HTTP API interface. These metrics can be viewed via native UI plugins or external monitoring systems such as Hyperic and NewRelic.</p>
-<h3><strong>Hyperic</strong></h3>
-<p>VMware vCenter Hyperic monitors operating systems, middleware, and applications running in physical, virtual and cloud environments. Pivotal App Suite Products have Hyperic Agent plugins to monitor health of the product. Hyperic provides a single console with powerful dashboards from which you can easily check the health of your applications and underlying infrastructure. Plugins for tc Server, Web Server and RabbitMQ Server are distributed with Hyperic Server.</p>
-<h3><strong>Pivotal tc Server</strong></h3>
-<p>VMware vCenter Hyperic can manage the lifecycle of tc Runtime instances by starting, stopping, and restarting local or remote instances. In addition to health metrics Pivotal tc Server includes a full set of diagnostic features that make it easy to troubleshoot problems with tc Runtime instances and the applications that you deploy to them. For each diagnostic feature, the tc Server Hyperic plug-in has one or more corresponding preconfigured alerts.<br />
-Additional details on monitoring configuration and metrics are available at:</p>
-<p><a href="http://tcserver.docs.pivotal.io/doc/30/index.html#getting-started/src/tuthyperic.html">http://tcserver.docs.pivotal.io/doc/30/index.html#getting-started/src/tuthyperic.html</a></p>
-<h3><strong>Pivotal Web Server</strong></h3>
-<p>BMX is an Apache HTTPD framework that provides internal runtime information (performance metrics, status, configuration, and current capacity) that is consumed by Pivotal Hyperic Agent. The agent monitor the health of Pivotal Web Server instances by running BMX queries to gather metrics and configuration information.</p>
-<p>Additional details on monitoring configuration and metrics are available at:</p>
-<p><a href="http://webserver.docs.pivotal.io/doc/60/index.html#web-server/src/config.html">http://webserver.docs.pivotal.io/doc/60/index.html#web-server/src/config.html</a></p>
-<h3><strong>Pivotal RabbitMQ Server</strong></h3>
-<p>The rabbitmq-management plugin provides an HTTP-based API for management and monitoring of your Pivotal RabbitMQ server. Hyperic’s RabbitMQ plugin manages RabbitMQ brokers, the virtual hosts within a broker, and RabbitMQ exchanges, queues, connections, and channels. The plugin can discover and manage multiple RabbitMQ nodes on the same platform as the Hyperic Agent.</p>
-<p><a href="http://pubs.vmware.com/hyperic-58/topic/com.vmware.hyperic.resource.configuration.metrics.doc/GUID-B0E86A1F-90FE-4C64-86AD-F1610E6012D3.html">http://pubs.vmware.com/hyperic-58/topic/com.vmware.hyperic.resource.configuration.metrics.doc/GUID-B0E86A1F-90FE-4C64-86AD-F1610E6012D3.html</a></p>
-<h2><strong>New Relic</strong></h2>
-<p>New Relic provides real-time monitoring of Web applications on-premises or in the cloud. The NewRelic plugins provided by Pivotal gather metric data for App Suite products and display them in your New Relic dashboard. The plugins are available in a public GitHub repository located at <a href="https://github.com/gopivotal/newrelic_pivotal_agent">https://github.com/gopivotal/newrelic_pivotal_agent</a>. See the provided README for any usage notes. Monitoring for tc Server is available via NewRelic Java agent.</p>			<div class="clearBoth"></div>
-		</div>
-		<div class="entry-utility">
-			<span class="cat-links"><a href="http://blog.pivotal.io/pivotal/products/easy-pivotal-app-installs-rpm-deb-msi-brew-chef-puppet-and-more"> on September 05, 2014 09:15 PM</a></span>
-		</div>
-	</div><!-- .post -->
-
-		<h3 id="todaysDate">August 21, 2014</h3>
-
-	<div class="hentry post">
-		<div class="postHeader">
-	<img class="face" src="images/nobody.png" alt="">
-
-			<h2 class="entry-title"><a href="http://blog.pivotal.io/pivotal-cloud-foundry/products/session-replication-on-cloud-foundry-2" title="Pivotal P.O.V. » Redis">Session Replication on Cloud Foundry</a></h2>
-
-<h3>Pivotal</h3>
-
-			<div class="clearBoth"></div>
-		</div>
-		<div class="entry-content">
-<p><img alt="featured-polycloud-green" class="alignleft size-full wp-image-8488" height="200" src="http://blog.pivotal.io/wp-content/uploads/2014/05/featured-polycloud-green.png" width="200" />Recently, the Java Buildpack added support for <a href="https://github.com/cloudfoundry/java-buildpack/blob/master/docs/container-tomcat.md#session-replication" style="color: #0074bd;" target="_blank">session replication</a> using Redis. This support complements the existing session affinity (i.e. sticky sessions) that Cloud Foundry already supports. So now, in addition to having sessions routed to the instance they were created on, sessions will also survive the loss of that instance. The Java Buildpack will auto-configure Redis-based Session Replication for you when it notices that you’ve bound to a specially identified Redis service.</p>
-<p>By default, the Tomcat instance provided by the Java Buildpack is <a href="https://github.com/cloudfoundry/java-buildpack/blob/master/docs/container-tomcat.md#configuration" style="color: #0074bd;" target="_blank">configured</a> to store all sessions and their data in memory. To make the instance use Redis-based Session Replication instead, bind a Redis service containing a <code>name</code>, <code>label</code>, or <code>tag</code> that has <code>session-replication</code> as a substring and the Java Buildpack will do the rest. <code>restage</code>ing your application will cause the required dependencies to be downloaded and configured.</p>
-<p><code>$&gt; cf restage cfrost-session-application<br />
-...<br />
------&gt; Java Buildpack Version: 41ccef3 | https://github.com/cloudfoundry/java-buildpack.git#41ccef3<br />
------&gt; Downloading Open Jdk JRE 1.7.0_65 from http://download.run.pivotal.io/openjdk/lucid/x86_64/openjdk-1.7.0_65.tar.gz (found in cache)<br />
-Expanding Open Jdk JRE to .java-buildpack/open_jdk_jre (1.0s)<br />
------&gt; Downloading Spring Auto Reconfiguration 1.4.0_RELEASE from http://download.run.pivotal.io/auto-reconfiguration/auto-reconfiguration-1.4.0_RELEASE.jar (found in cache)<br />
------&gt; Downloading Tomcat Instance 7.0.54 from http://download.run.pivotal.io/tomcat/tomcat-7.0.54.tar.gz (found in cache)<br />
-Expanding Tomcat to .java-buildpack/tomcat (0.1s)<br />
------&gt; Downloading Tomcat Lifecycle Support 2.2.0_RELEASE from http://download.run.pivotal.io/tomcat-lifecycle-support/tomcat-lifecycle-support-2.2.0_RELEASE.jar (found in cache)<br />
------&gt; Downloading Tomcat Logging Support 2.2.0_RELEASE from http://download.run.pivotal.io/tomcat-logging-support/tomcat-logging-support-2.2.0_RELEASE.jar (found in cache)<br />
------&gt; Downloading Tomcat Access Logging Support 2.2.0_RELEASE from http://download.run.pivotal.io/tomcat-access-logging-support/tomcat-access-logging-support-2.2.0_RELEASE.jar (found in cache)<br />
------&gt; Downloading Tomcat Redis Store 1.2.0_RELEASE from http://download.run.pivotal.io/redis-store/redis-store-1.2.0_RELEASE.jar (0.0s)<br />
-Adding Redis-based Session Replication<br />
------&gt; Uploading droplet (45M)<br />
-1 of 1 instances running<br />
-...<br />
-App started</code></p>
-<p>The console output shows that the Tomcat Redis Store is downloaded because your application is bound to a Redis service. Redis-based Session Replication is then added to the Tomcat instance because of the service’s name. You can verify the session persistence directly by exercising your application from a couple of different browsers and then using the <code>redis-cli</code> tool to inspect Redis.</p>
-<p><code>$&gt; redis-cli keys *<br />
-1) "A174CD1FC86066A01B78572DED1F9618"<br />
-2) "D6B37E35788FCC50CD5B28FB68682735"<br />
-3) "78CBE316C140C3528D0B6590A7CAC774"<br />
-4) "AAEECAA96947C5EDBD9C967FCABE472C"<br />
-5) "F189383702E2694552277EB1ACC3F1A5"<br />
-6) "B8A7D7A229B063BB9E4A5F853BB95D9D"<br />
-7) "25EF288A4552F24735CDCC78D169F776"</code></p>
-<p>The Redis keys are the ids of the stored sessions. These sessions can be retrieved by any instance of your application. This means that if an instance of your application crashes or is restarted, any other live instance can pick up the session and the user won’t have to start again. You can try this for yourself with this <a href="https://github.com/nebhale/cfsummit-2014" style="color: #0074bd;" target="_blank">demo application</a> and a full walk-through in <a href="https://www.youtube.com/watch?v=hy_huSXghI8" style="color: #0074bd;" target="_blank">Ben Hale’s CF Summit 2014 talk</a> at 9 minutes in.</p>			<div class="clearBoth"></div>
-		</div>
-		<div class="entry-utility">
-			<span class="cat-links"><a href="http://blog.pivotal.io/pivotal-cloud-foundry/products/session-replication-on-cloud-foundry-2"> on August 21, 2014 05:24 PM</a></span>
-		</div>
-	</div><!-- .post -->
-
-		<h3 id="todaysDate">June 06, 2014</h3>
-
-	<div class="hentry post">
-		<div class="postHeader">
-	<img class="face" src="images/nobody.png" alt="">
-
-			<h2 class="entry-title"><a href="http://blog.pivotal.io/pivotal-cloud-foundry/news-2/redislabs-now-available-in-pivotal-web-services-marketplace" title="Pivotal P.O.V. » Redis">RedisLabs Now Available in Pivotal Web Services Marketplace</a></h2>
-
-<h3>Pivotal</h3>
-
-			<div class="clearBoth"></div>
-		</div>
-		<div class="entry-content">
-<p><i>The following is a guest blog post by <a href="https://twitter.com/itamarhaber">Itamar Haber</a>, Chief Developers Advocate at </i><a href="https://redislabs.com/"><i>Redis Labs</i></a><i>, a provider of enterprise-class Redis for developers.</i></p>
-<p>Redis Cloud is a fully-managed cloud service for hosting and running Redis datasets. The service provides developers with a highly-available, scalable and performant database-as-a-service that is ideally suited to scalable web and mobile app. For Cloud Foundry developers building and hosting apps on Pivotal Web Services, you can now add Redis Cloud to your apps directly from the Services Marketplace.</p>
-<h2>Web Console</h2>
-<p><a href="https://console.run.pivotal.io/marketplace" target="_blank"><img alt="RedisBlog - Image 1" class="alignnone size-full wp-image-9067" height="637" src="http://blog.gopivotal.com/wp-content/uploads/2014/06/RedisBlog-Image-12.png" width="1078" /></a></p>
-<p>Click on the Redis Cloud service to see the Plan Selection page:</p>
-<p><a href="https://console.run.pivotal.io/marketplace/rediscloud" target="_blank"><img alt="RedisBlog - Image 2" class="alignnone size-full wp-image-9068" height="671" src="http://blog.gopivotal.com/wp-content/uploads/2014/06/RedisBlog-Image-22.png" width="899" /></a></p>
-<p>Choose a plan to start with (I recommend starting with the Free 25MB plan) and select the ‘BUY THIS PLAN’ button to create the service instance. You can also choose to bind it to a specific application. If you aren’t ready to bind the RedisDB to your app right now, you can always bind it later from the application dashboard or through the command line interface (CLI).</p>
-<p><img alt="RedisBlog - Image 3" class="alignnone size-full wp-image-9069" height="629" src="http://blog.gopivotal.com/wp-content/uploads/2014/06/RedisBlog-Image-32.png" width="1060" /></p>
-<p><span style="font-size: 1.5em;">Command Line Interface</span></p>
-<p>If you’re more inclined to use the command line interface, here are the steps:</p>
-<p>First, create the service:</p>
-<p><code>$ cf create-service rediscloud PLAN_NAME INSTANCE_NAME</code></p>
-<p>Where <code>PLAN_NAME</code> is the plan you want to use and <code>INSTANCE_NAME</code> is the name you want to use for the service. Once the service’s instance is created, bind it to your application with the following command:</p>
-<p><code>$ cf bind-service APP_NAME INSTANCE_NAME<br />
-</code></p>
-<p>Where <code>APP_NAME</code> is the name of the application that the service will be bound to.</p>
-<p>That’s all there is to it—your first database will be created automatically, and your app will now be able to use Redis Cloud. You can obtain the immutable endpoint (hostname and port) of your Redis Cloud database by fetching the contents of your app’s <code>VCAP_SERVICE</code>S environment variable, or from the service’s management console (click the ‘MANAGE’ link in under the Redis Cloud service). Depending on the plan you purchased, you can also use the management console to edit the properties of your database.</p>
-<p>Redis Cloud is fully compliant with the open source Redis project, so all you need to do is point your application to your Redis Cloud endpoint and you’re good to go. For example, if you’re using Ruby, create an intializer file (e.g. config/initializers/redis.rb) with the following content:</p>
-<blockquote><p>rediscloud_service = JSON.parse(ENV[‘VCAP_SERVICES’])[“rediscloud-n/a”]</p>
-<p>credentials = rediscloud_service.first[“credentials”]</p>
-<p>$redis = Redis.new(:host =&gt; credentials[“hostname”], :port =&gt; credentials[“port”], :password =&gt; credentials[“password”])</p></blockquote>
-<p>That’s all that’s needed to get you started so you can focus on developing your application instead of worrying about things like:</p>
-<ul>
-<li>node failures (our service boasts automatic and transparent failover),</li>
-<li>scaling up or down (that’s done seamlessly, instantly and without interruption to the service),</li>
-<li>data persistence (included free of charge),</li>
-<li>daily and on-demand backups (also included), or</li>
-<li>any other operational aspect regarding your Redis database.</li>
-</ul>
-<p>If you need any help, have questions or feedback—feel free to contact Itamar via <a href="mailto:itamar@redislabs.com">email</a> or <a href="https://twitter.com/@itamarhaber">Twitter</a>. For support questions, send an email to <a href="mailto:support@redislabs.com">support@redislabs.com</a>. Happy coding!</p>			<div class="clearBoth"></div>
-		</div>
-		<div class="entry-utility">
-			<span class="cat-links"><a href="http://blog.pivotal.io/pivotal-cloud-foundry/news-2/redislabs-now-available-in-pivotal-web-services-marketplace"> on June 06, 2014 06:13 PM</a></span>
-		</div>
-	</div><!-- .post -->
-
-		<h3 id="todaysDate">December 03, 2013</h3>
-
-	<div class="hentry post">
-		<div class="postHeader">
-	<img class="face" src="images/nobody.png" alt="">
-
-			<h2 class="entry-title"><a href="http://blog.pivotal.io/pivotal/news-2/pivotal-offering-redis-support-redis-2-8-0-now-available" title="Pivotal P.O.V. » Redis">Pivotal Offering Redis Support + Redis 2.8.0 Now Available</a></h2>
-
-<h3>Pivotal</h3>
-
-			<div class="clearBoth"></div>
-		</div>
-		<div class="entry-content">
-<p><a href="http://download.redis.io/releases/redis-2.8.1.tar.gz" target="_blank"><img alt="cta-download-redis" class="alignleft size-full wp-image-5566" height="200" src="http://blog.gopivotal.com/wp-content/uploads/2013/12/cta-download-redis.jpg" width="200" /></a>Earlier this year, we published a <a href="http://blog.gopivotal.com/pivotal-people/pivotal-people-salvatore-sanfilippo-inventor-of-redis" target="_blank" title="Pivotal People Salvatore Sanfillipo">story on one of our Pivotal People, Salvatore Sanfillipo</a>, the inventor of <a href="http://redis.io/" target="_blank" title="Redis">Redis</a>. First released in 2009, Redis is a popular open source in-memory data cache, with over a million users worldwide. It is used to speed up data in many of the most popular web applications that deal with huge data volumes, including Twitter, Yahoo, LinkedIn, and Pinterest.</p>
-<p>Savvy readers noticed Pivotal was becoming a hot bed for Redis knowledge and development, and today we are happy to extend that competency out to commercial support offerings. As of today, Pivotal will be offering 2 types of services for companies that have grown to depend on Redis and would like commercial support.</p>
-<ul>
-<li><span style="line-height: 13px;"><strong>Developer Support.</strong> Priced per developer, this support is designed to support developers as they build out and support their own systems. Support is available for 12 hours a day, 5 days a week and is valid for one year.</span></li>
-<li><strong>Production Support.</strong> Priced per CPU, this support is the type of round-the-clock support that is needed for customer facing apps companies use to run their business.</li>
-</ul>
-<p>To request support, <a href="http://www.gopivotal.com/contact" target="_blank" title="Contact Pivotal">contact Pivotal via our website</a> or email us at <strong>redis@gopivotal.com</strong>.</p>
-<h3><strong>Redis 2.8.0 Now Available</strong></h3>
-<p>In addition, after nearly a year of development, and weeks without a serious bug being reported for the public beta, <a href="https://groups.google.com/forum/#!topic/redis-db/37xgI268Nh8" target="_blank" title="Redis 2.8.0 Now Available">Redis 2.8.0 has been released as stable code</a>.</p>
-<p>With nearly 1000 commits to the now stable branch, many things are improved in the latest version, including:</p>
-<ul>
-<li>Partial resynchronization with slaves. It is no longer needed to transfer all the data set from the master to the slave if the link is interrupted for a short time. <a href="http://antirez.com/news/47" target="_blank" title="Partial resynchronization with Redis">&gt;&gt; More</a><a href="http://www.google.com/url?q=http%3A%2F%2Fantirez.com%2Fnews%2F47&amp;sa=D&amp;sntz=1&amp;usg=AFQjCNFVMoAzEYCVzbRPBle7ZoptdtGo3w" target="_blank"><br />
-</a></li>
-<li>Redis collections are now iterable with SCAN / HSCAN / ZSCAN / SSCAN. <a href="http://antirez.com/news/63" target="_blank" title="Redis collections are iterable">&gt;&gt; More</a></li>
-<li>The CONFIG module was re-written to allow config changes sent directly to instances to be propagated to the server in order to preserve how the server works after a reboot. <a href="http://antirez.com/news/54" target="_blank" title="Redis CONFIG rewrite">&gt;&gt; More</a></li>
-<li>IPv6 support.</li>
-<li>Scripting improvements (EVALSHA replication).</li>
-<li>Better key expiring algorithm.</li>
-<li>Keyspace events notification via Pub/Sub.<a href="http://redis.io/topics/notifications" target="_blank" title="Keyspace notifications"> &gt;&gt; More</a></li>
-<li>Better consistency support with the ability to stop writes if there are not at least N slaves that are not lagged more than M milliseconds.</li>
-<li>A number of additional small features and bugs fixed.</li>
-</ul>
-<p><a href="http://www.gopivotal.com/big-data/redis" target="_blank"><img alt="Pivotal-Blog-CTA-Redis" class="alignnone size-full wp-image-6690" height="135" src="http://blog.gopivotal.com/wp-content/uploads/2013/12/Pivotal-Blog-CTA-Redis.jpg" width="600" /></a></p>
-<h4><strong>About the Sentinel Re-write</strong></h4>
-<p><a href="http://redis.io/topics/sentinel" target="_blank" title="Redis Sentinel">Redis Sentinel</a>, the management system dedicated to Redis, was rewritten from scratch to be more reliable. The new version is available to work with Redis 2.8.0, however it must be downloaded from the unstable branch.</p>
-<h4><strong>Upgrading</strong></h4>
-<p>For companies with Redis installed, it is recommended that you consider the list of features and improvements for Redis 2.8.0 and establish a plan to upgrade when it fits the needs of the business. While upgrades are encouraged, previous versions are stable and can continue to support your projects. However, given the degree of revisions and improvements for Sentinel, it is recommended that users upgrade Sentinel to the new version as soon as possible.</p>			<div class="clearBoth"></div>
-		</div>
-		<div class="entry-utility">
-			<span class="cat-links"><a href="http://blog.pivotal.io/pivotal/news-2/pivotal-offering-redis-support-redis-2-8-0-now-available"> on December 03, 2013 05:35 PM</a></span>
-		</div>
-	</div><!-- .post -->
-
 			</div><!-- #content -->
 		</div><!-- #container -->
 
@@ -941,7 +723,7 @@ App started</code></p>
 			<ul class="xoxo">
 				<li class="widgetcontainer widget_text">
           <h3 class="widgettitle">About the Community Redis Blog Aggregator</h3>
-					<p>This website is a community-maintained and inclusive feed of Redis-related blog posts. To add your blog's feed, please fork <a href="https://github.com/xaprb/planetredis">the repository</a>, modify the config.ini file to add your feed at the end, and submit a pull request.</p>
+					<p>This website is a community-maintained and inclusive feed of Redis-related blog posts. To add your blog's feed, please fork <a href="https://github.com/VividCortex/planetredis">the repository</a>, modify the config.ini file to add your feed at the end, and submit a pull request.</p>
 				</li>
 				<li class="widgetcontainer widget_extended-categories">
 					<h3 class="widgettitle">Feeds</h3>
@@ -950,13 +732,16 @@ App started</code></p>
 							<a href="http://antirez.com/rss" title="subscribe"><img src="images/feed-icon-10x10.png" alt="(feed)" /></a> <a href="http://antirez.com" title="Antirez weblog">Antirez</a>
 						</li>
 						<li>
+							<a href="http://www.xaprb.com/index.xml" title="subscribe"><img src="images/feed-icon-10x10.png" alt="(feed)" /></a> <a href="http://www.xaprb.com/" title="">Baron Schwartz</a>
+						</li>
+						<li>
 							<a href="http://blog.pivotal.io/tag/redis/feed" title="subscribe"><img src="images/feed-icon-10x10.png" alt="(feed)" /></a> <a href="http://blog.pivotal.io" title="Pivotal P.O.V. » Redis">Pivotal</a>
 						</li>
 						<li>
 							<a href="https://redislabs.com/feed" title="subscribe"><img src="images/feed-icon-10x10.png" alt="(feed)" /></a> <a href="https://redislabs.com" title="Redis Labs">Redis Labs</a>
 						</li>
 						<li>
-							<a href="https://vividcortex.com/index.xml" title="subscribe"><img src="images/feed-icon-10x10.png" alt="(feed)" /></a> <a href="https://vividcortex.com/" title="VividCortex">Vivid Cortex</a>
+							<a href="https://vividcortex.com/index.xml" title="subscribe"><img src="images/feed-icon-10x10.png" alt="(feed)" /></a> <a href="https://vividcortex.com/" title="VividCortex">VividCortex</a>
 						</li>
 					</ul>
 				</li>
